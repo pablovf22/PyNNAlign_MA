@@ -104,7 +104,7 @@ def main():
     print(f"[MODEL] Initializing NNAlign_MA architecture...")
     model = NNAlign_MA(n_hidden=args.n_hidden)
 
-    criterion = torch.nn.BCEWithLogitsLoss()
+    criterion = torch.nn.MSELoss()
     lr = args.learning_rate
     optimizer = torch.optim.SGD(model.parameters(), lr=lr)
 

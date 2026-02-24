@@ -85,7 +85,7 @@ def main():
     print(f"[MODEL] Initializing NNAlign_SA architecture...")
     model = NNAlign_MA(n_hidden=args.n_hidden)
 
-    criterion = torch.nn.BCEWithLogitsLoss()
+    criterion = torch.nn.MSELoss()
     lr = args.learning_rate
     optimizer = torch.optim.SGD(model.parameters(), lr=lr)
 
@@ -102,5 +102,6 @@ def main():
     print(f"[DONE] Saving weights to {syn_path}")
     trainer.save(syn_path=syn_path)
 
-    if __name__ == "__main__":
-        main()
+
+if __name__ == "__main__":
+    main()

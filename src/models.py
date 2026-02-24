@@ -42,7 +42,8 @@ class NNAlign_MA(nn.Module):
         z = self.in_layer(X_tensor)
         z = self.activation(z)
         z = self.out_layer(z).squeeze(-1)       #From a 2d tensor to a 1d tensor, the embedding results in a loggit
-        
+        z = torch.sigmoid(z)
+
         #Create a batch size vector and then fill it with the maximum loggit in each group (peptide)
         z_max = torch.full((batch_size,), float("-inf"), device=z.device, dtype=z.dtype) 
         z_max = torch.scatter_reduce(z_max, 0, group, z, reduce="amax", include_self=True)
