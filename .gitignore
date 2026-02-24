@@ -1,0 +1,12 @@
+#python cache
+__pycache__/
+*.pyc
+
+#data
+data/
+
+#outputs
+logs/
+
+#models weights
+models/

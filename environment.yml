@@ -1,0 +1,10 @@
+name: pyNNAlign_MA
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge
+channel_priority: strict
+dependencies:
+  - python=3.9
+  - pytorch
+  - pytorch-cuda=12.1
