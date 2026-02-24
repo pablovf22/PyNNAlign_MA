@@ -122,10 +122,10 @@ class NNAlign_MA_OffsetDataset(Dataset):
 
 class NNAlign_MA_Dataset(Dataset):
     """
-    In-memory map-style dataset for NNAlign MA training.
+    In-memory dataset for NNAlign MA training.
 
     Loads the entire text file into memory as (peptide, label, cell_line)
-    tuples. Optionally filters single-allele (SA) entries during loading.
+    tuples.
     """
 
     def __init__(self, file_path):

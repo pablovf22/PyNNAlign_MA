@@ -11,14 +11,15 @@ class NNAlign_MA_trainer:
     """
 
 
-    def __init__(self, model, criterion, optimizer, make_loader, device):
+    def __init__(self, model, criterion, optimizer, device, loader_ma, loader_sa, SA_burn_in):
 
         self.model = model.to(device)  # move model to device
         self.criterion = criterion
         self.optimizer = optimizer
-        self.make_loader = make_loader
         self.device = device
-
+        self.loader_ma = loader_ma
+        self.loader_sa = loader_sa
+        self.SA_burn_in = SA_burn_in
 
     def _train_one_epoch(self, loader):
 
@@ -42,7 +43,12 @@ class NNAlign_MA_trainer:
 
         for epoch in range(num_epochs):
 
-            loader = self.make_loader(epoch)
+            if epoch == 0:
+                print(f"--- Phase: SA Burn-in (Epochs 1-{self.SA_burn_in}) ---")
+            elif epoch == self.SA_burn_in:
+                print(f"--- Phase: Full Multi-Allele (Epochs {self.SA_burn_in+1}+) ---")
+
+            loader = self.loader_sa if epoch < self.SA_burn_in else self.loader_ma
             self._train_one_epoch(loader)
 
             if epoch % 1 == 0:

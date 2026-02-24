@@ -46,7 +46,7 @@ def main():
     syn_path = args.synapse_file
 
     batch_size = args.batch_size
-    SA_burn_in = args.burn_in_sa  # number of single-allele burn-in epochs
+    SA_burn_in = args.burn_in_sa  #number of single-allele burn-in epochs
     
     if torch.cuda.is_available():
         device = torch.device("cuda")
@@ -58,7 +58,7 @@ def main():
 
     print(f"[INFO] Starting script. Target device: {device}")
 
-    # Load preprocessing resources
+    #Load preprocessing resources
     print("[1/4] Loading BLOSUM and Allele resources...")
     blosum_matrix, aa_to_idx = load_blosum(blosum_file=blosum_file)
     allele_dict = load_allelist(allelelist_file=allelelist_file)
@@ -67,8 +67,7 @@ def main():
                                       blosum_matrix=blosum_matrix, 
                                       pseudoseqs_file=pseudoseqs_file)
 
-    # Initialize collator for batch construction
-    collator = CollatorClassII(blosum_matrix=blosum_matrix, aa_to_idx=aa_to_idx, pseudoseqs_dict=pseudoseqs_dict, allele_dict=allele_dict)
+    #Initialize datasets
     dataset_class = NNAlign_MA_Dataset
     print(f"[3/4] Loading full dataset into RAM from {data_file}...")
     dataset_ma = dataset_class(file_path=data_file)
@@ -78,34 +77,32 @@ def main():
         if len(allele_dict[cell_line]) == 1
     ]
 
-    sa_dataset = torch.utils.data.Subset(dataset_ma, sa_idx)
+    dataset_sa = torch.utils.data.Subset(dataset_ma, sa_idx)
     print(f"[STATUS] Dataset ready. Total samples: {len(dataset_ma)} | SA samples: {len(sa_idx)}")
 
-    def make_loader(epoch):
+    #Initialize collator for batch construction
+    collator = CollatorClassII(blosum_matrix=blosum_matrix, aa_to_idx=aa_to_idx, pseudoseqs_dict=pseudoseqs_dict, allele_dict=allele_dict)
 
-        if epoch == 0:
-            print(f"--- Phase: SA Burn-in (Epochs 1-{SA_burn_in}) ---")
-        elif epoch == SA_burn_in:
-            print(f"--- Phase: Full Multi-Allele (Epochs {SA_burn_in+1}+) ---")
-
-        # Create epoch-dependent dataset (SA burn-in phase)
-        dataset = sa_dataset if epoch < SA_burn_in else dataset_ma
-
-        loader = DataLoader(
-            dataset=dataset,
-            batch_size=batch_size,
-            num_workers=4,
-            collate_fn=collator,
-            pin_memory=pin_memory,
-            shuffle=True
-        )
-
-        return loader
-
+    #Initialize dataloaders
+    loader_sa = DataLoader(dataset_sa, 
+                           batch_size=batch_size, 
+                           shuffle=True,
+                           num_workers=4, 
+                           collate_fn=collator, 
+                           pin_memory=pin_memory,
+                           persistent_workers=True)
+    
+    loader_ma = DataLoader(dataset_ma, 
+                           batch_size=batch_size, 
+                           shuffle=True,
+                           num_workers=4, 
+                           collate_fn=collator, 
+                           pin_memory=pin_memory,
+                           persistent_workers=True)
 
     # Initialize model, loss and optimizer
     print(f"[MODEL] Initializing NNAlign_MA architecture...")
-    model = NNAlign_MA(n_hidden=arg.n_hidden)
+    model = NNAlign_MA(n_hidden=args.n_hidden)
 
     criterion = torch.nn.BCEWithLogitsLoss()
     lr = args.learning_rate
@@ -115,7 +112,9 @@ def main():
                                  criterion=criterion,
                                  optimizer=optimizer,
                                  device=device,
-                                 make_loader=make_loader)
+                                 SA_burn_in=SA_burn_in,
+                                 loader_ma=loader_ma,
+                                 loader_sa=loader_sa)
     
     # Train model and save learned weights
     print(f"[TRAIN] Beginning training for {SA_burn_in} SA epochs + remaining MA epochs...")
