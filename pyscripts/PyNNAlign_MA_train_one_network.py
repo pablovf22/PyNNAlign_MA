@@ -13,8 +13,8 @@ if PROJECT_ROOT_STR not in sys.path:
     sys.path.insert(0, PROJECT_ROOT_STR)
 
 from src.models import NNAlign_MA
-from src.datasets import NNAlign_MA_Dataset, NNAlign_MA_IterableDataset, NNAlign_MA_OffsetDataset
-from src.datasets_utils import CollatorClassII, load_blosum, load_allelist, load_pseudoseqs
+from src.datasets import NNAlign_MA_Dataset
+from src.datasets_utils import Collator_MA_Blosum_ClassII, load_blosum, load_allelist, load_pseudoseqs
 from src.trainers import NNAlign_MA_trainer
 
 
@@ -81,7 +81,7 @@ def main():
     print(f"[STATUS] Dataset ready. Total samples: {len(dataset_ma)} | SA samples: {len(sa_idx)}")
 
     #Initialize collator for batch construction
-    collator = CollatorClassII(blosum_matrix=blosum_matrix, aa_to_idx=aa_to_idx, pseudoseqs_dict=pseudoseqs_dict, allele_dict=allele_dict)
+    collator = Collator_MA_Blosum_ClassII(blosum_matrix=blosum_matrix, aa_to_idx=aa_to_idx, pseudoseqs_dict=pseudoseqs_dict, allele_dict=allele_dict)
 
     #Initialize dataloaders
     loader_sa = DataLoader(dataset_sa, 

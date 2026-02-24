@@ -152,5 +152,3 @@ class NNAlign_MA_Dataset(Dataset):
     def __getitem__(self, idx):
         """Return sample at given index."""
         return self.dataset[idx]
-
-

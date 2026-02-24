@@ -21,6 +21,7 @@ class NNAlign_MA_trainer:
         self.loader_sa = loader_sa
         self.SA_burn_in = SA_burn_in
 
+
     def _train_one_epoch(self, loader):
 
         self.model.train()  # set training mode

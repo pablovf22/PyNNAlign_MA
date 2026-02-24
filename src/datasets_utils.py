@@ -1,5 +1,6 @@
 import torch
 
+
 def load_blosum(blosum_file):
     rows = []
     alphabet = None
@@ -63,7 +64,7 @@ def load_pseudoseqs(pseudoseqs_file, aa_to_idx, blosum_matrix):
 
 
 
-class BaseCollator_Blosum:
+class Collator_MA_Blosum:
     """
     Base collator implementing the common batching pipeline for MHC peptide data.
 
@@ -91,9 +92,6 @@ class BaseCollator_Blosum:
         E = self.blosum_matrix.size(0)
 
         for pep_i, (peptide, label, cell_line) in enumerate(batch):
-
-            assert len(peptide) >= 9, f"Invalid peptide (< 9aa): {peptide}, cell_line={cell_line}"
-            assert cell_line in self.allele_dict, f"Unknown cell_line={cell_line}"
 
             windows_embedding, W = self._encode_windows(peptide, E)
             pseudoseqs_tensor, P = self._get_pseudoseqs(cell_line)
@@ -131,7 +129,6 @@ class BaseCollator_Blosum:
             for allele in alleles
             if allele in self.pseudoseqs_dict
         ]
-        assert pseudoseqs_list, f"No pseudosequences found for {cell_line}."
 
         pseudoseqs_tensor = torch.stack(pseudoseqs_list, dim=0)
         P = pseudoseqs_tensor.size(0)
@@ -164,18 +161,15 @@ class BaseCollator_Blosum:
         Pack variable-length peptide data into contiguous batch tensors.
         """
 
-        assert X_list, "Empty batch after collation (no valid samples). Check dataset preprocessing."
-
         X = torch.cat(X_list, dim=0)
         y = torch.cat(y_list, dim=0)
         pep_idx = torch.cat(pep_idx_list, dim=0)
 
-        assert X.size(0) == pep_idx.numel(), "Mismatch between X and pep_idx sizes"
         return X, y, pep_idx
 
 
 
-class CollatorClassII(BaseCollator_Blosum):
+class Collator_MA_Blosum_ClassII(Collator_MA_Blosum):
     """
     Collator for MHC class II peptides.
 
@@ -194,3 +188,34 @@ class CollatorClassII(BaseCollator_Blosum):
 
         windows_embedding = self.blosum_matrix[windows_idxs].reshape(W, 9 * E)
         return windows_embedding, W
+    
+
+class Collator_SA_Blosum_ClassII(Collator_MA_Blosum_ClassII):
+
+    def __init__(self, blosum_matrix, aa_to_idx, pseudoseqs_dict):
+
+        self.pseudoseqs_dict = pseudoseqs_dict
+        self.blosum_matrix = blosum_matrix
+        self.aa_to_idx = aa_to_idx
+
+
+    def __call__(self, batch):
+
+        X_list, y_list, pep_idx_list = [], [], []
+        E = self.blosum_matrix.size(0)
+
+        for pep_i, (peptide, label, allele) in enumerate(batch):
+
+            windows_embedding, W = self._encode_windows(peptide, E)
+            pseudoseqs_tensor = self.pseudoseqs_dict[allele].unsqueeze(0) 
+
+            X = self._combine_window_pseudoseq(
+                windows_embedding, pseudoseqs_tensor, W, 1
+            )
+            y, pep_idx = self._make_targets_idx(label, pep_i, W, 1)
+
+            X_list.append(X)
+            y_list.append(y)
+            pep_idx_list.append(pep_idx)
+
+        return self._finalize_batch(X_list, y_list, pep_idx_list)

@@ -19,7 +19,7 @@ class NNAlign_MA(nn.Module):
     """
 
 
-    def __init__(self, n_hidden=66, aa_embedding_dim=24, window_size=9, pseudoseq_size=34):
+    def __init__(self, n_hidden=56, aa_embedding_dim=24, window_size=9, pseudoseq_size=34):
 
         super(NNAlign_MA, self).__init__()
         self.aa_embedding_dim = aa_embedding_dim
