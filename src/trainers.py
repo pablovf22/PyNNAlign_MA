@@ -20,11 +20,16 @@ class NNAlign_MA_trainer:
         self.loader_ma = loader_ma
         self.loader_sa = loader_sa
         self.SA_burn_in = SA_burn_in
+        self.MSE_train = []
+        self.PCC_train = []
 
 
     def _train_one_epoch(self, loader):
 
         self.model.train()  # set training mode
+
+        z_max_epoch = []
+        y_epoch = []
 
         for batch in loader:
             
@@ -36,10 +41,24 @@ class NNAlign_MA_trainer:
             z_max = self.model(X, pep_idx)
             batch_loss = self.criterion(z_max, y)
 
+            z_max_epoch.append(z_max.detach())
+            y_epoch.append(y.detach())
+
             batch_loss.backward()
             self.optimizer.step()
 
+        z_max_epoch = torch.cat(z_max_epoch, dim=0)
+        y_epoch = torch.cat(y_epoch, dim=0)
 
+        PCC_epoch = self._pcc_torch(z_max_epoch=z_max_epoch, y_epoch=y_epoch)
+        MSE_epoch = ((z_max_epoch - y_epoch) ** 2).mean().item()
+
+        print(f"MSE: {MSE_epoch}  --  PCC: {PCC_epoch}")
+
+        self.MSE_train.append(MSE_epoch)
+        self.PCC_train.append(PCC_epoch)
+
+        
     def train(self, num_epochs=300):
 
         for epoch in range(num_epochs):
@@ -49,13 +68,26 @@ class NNAlign_MA_trainer:
             elif epoch == self.SA_burn_in:
                 print(f"--- Phase: Full Multi-Allele (Epochs {self.SA_burn_in+1}+) ---")
 
+            print(f"Epoch {epoch+1}")
+
             loader = self.loader_sa if epoch < self.SA_burn_in else self.loader_ma
             self._train_one_epoch(loader)
-
-            if epoch % 1 == 0:
-                print(f"Epoch {epoch+1}")
 
 
     def save(self, syn_path):
 
         torch.save(self.model.state_dict(), syn_path)  # save model weights
+
+
+    @staticmethod
+    def _pcc_torch(z_max_epoch, y_epoch, eps=1e-8):
+
+        x = z_max_epoch - z_max_epoch.mean()
+        y = y_epoch - y_epoch.mean()
+
+        numerator = (x * y).sum()
+        denominator = torch.sqrt((x**2).sum()) * torch.sqrt((y**2).sum()) + eps
+
+        return (numerator / denominator).item()
+
+
