@@ -143,7 +143,7 @@ class NNAlign_MA_Dataset(Dataset):
                 peptide, label, cell_line = line.strip().split()[:3]
 
                 # Store sample as (peptide, int label, cell_line)
-                self.dataset.append((peptide, int(label), cell_line))
+                self.dataset.append((peptide, int(float(label)), cell_line))
 
     def __len__(self):
         """Return number of loaded samples."""
