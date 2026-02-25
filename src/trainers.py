@@ -76,7 +76,6 @@ class NNAlign_MA_trainer:
             for batch in self.loader_val:
 
                 X, y, pep_idx = [tensor.to(self.device, non_blocking=True) for tensor in batch]
-                y = y.float()
 
                 z_max = self.model(X, pep_idx)
 
@@ -110,12 +109,13 @@ class NNAlign_MA_trainer:
             self._train_one_epoch(loader)
             self._validate_one_epoch()
 
-            self.logger.log({
-                "MSE_train": self.MSE_train[-1],
-                "PCC_train": self.PCC_train[-1],
-                "MSE_val": self.MSE_val[-1],
-                "PCC_val": self.PCC_val[-1]
-                }, step=epoch+1)
+            if self.logger is not None:
+                self.logger.log({
+                    "MSE_train": self.MSE_train[-1],
+                    "PCC_train": self.PCC_train[-1],
+                    "MSE_val": self.MSE_val[-1],
+                    "PCC_val": self.PCC_val[-1]
+                    }, step=epoch+1)
 
 
     def save(self, syn_path):

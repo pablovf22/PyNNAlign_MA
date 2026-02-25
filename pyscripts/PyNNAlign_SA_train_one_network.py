@@ -29,13 +29,12 @@ def args_parser():
     parser.add_argument("-bl", "--blosum_file", type=str, help="Path to the blosum file.")
     parser.add_argument("-ps", "--pseudoseqs_file", type=str, help="Path to the pseudoseqs file.")
     parser.add_argument("-syn", "--synapse_file", type=str, help="Path to save the model weights.")
-    parser.add_argument("-nh", "--n_hidden", type=int, default=66, help="Number of hidden neurons.")
-    parser.add_argument("-lr", "--learning_rate", type=float, default=1e-2, help="Learning rate.")
+    parser.add_argument("-nh", "--n_hidden", type=int, default=56, help="Number of hidden neurons.")
+    parser.add_argument("-lr", "--learning_rate", type=float, default=0.025, help="Learning rate.")
     parser.add_argument("-e", "--num_epochs", type=int, default=300, help="Number of epochs.")
     parser.add_argument("-val", "--validation_file", type=str, help="Path to the validation data file.")
     parser.add_argument("-tc", "--training_curves", type=str, help="Path to save teh training curves figure.")
     parser.add_argument("-wb", "--wandb_name", type=str, help="Name of this run to be logged in W&B.")
-
 
     return parser.parse_args()
 
@@ -117,7 +116,7 @@ def main():
                                  optimizer=optimizer,
                                  device=device,
                                  SA_burn_in=SA_burn_in,
-                                 loader_ma=None,
+                                 loader_ma=loader_sa,
                                  loader_sa=loader_sa,
                                  loader_val=loader_val,
                                  logger=wandb)
