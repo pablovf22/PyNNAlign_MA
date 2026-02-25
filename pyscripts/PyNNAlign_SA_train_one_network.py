@@ -52,10 +52,9 @@ def main():
     SA_burn_in = args.num_epochs  #number of single-allele burn-in epochs
 
 
-    wandb.init(
-    project="PyNNAlign_MA",
-    name=args.wandb_name,
-    config=vars(args))
+    run = wandb.init(project="PyNNAlign_MA",
+                     name=args.wandb_name,
+                     config=vars(args))
     
     if torch.cuda.is_available():
         device = torch.device("cuda")
@@ -119,7 +118,7 @@ def main():
                                  loader_ma=loader_sa,
                                  loader_sa=loader_sa,
                                  loader_val=loader_val,
-                                 logger=wandb)
+                                 logger=run)
     
     #Train model and save learned weights
     trainer.train(num_epochs=args.num_epochs)
