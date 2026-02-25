@@ -131,5 +131,7 @@ def main():
     #Plot and save training curves
     plot_training_curves(trainer=trainer, save_path=args.training_curves)
 
+    wandb.finish()
+
 if __name__ == "__main__":
     main()
