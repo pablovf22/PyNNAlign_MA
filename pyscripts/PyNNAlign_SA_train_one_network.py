@@ -3,6 +3,7 @@ import argparse
 from pathlib import Path
 import torch
 from torch.utils.data import DataLoader
+import wandb
 
 #Resolve project root directory (two levels up from this file)
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -16,6 +17,7 @@ from src.models import NNAlign_MA
 from src.datasets import NNAlign_MA_Dataset
 from src.datasets_utils import Collator_SA_Blosum_ClassII, load_blosum, load_pseudoseqs
 from src.trainers import NNAlign_MA_trainer
+from src.utils import plot_training_curves
 
 
 def args_parser():
@@ -30,6 +32,10 @@ def args_parser():
     parser.add_argument("-nh", "--n_hidden", type=int, default=66, help="Number of hidden neurons.")
     parser.add_argument("-lr", "--learning_rate", type=float, default=1e-2, help="Learning rate.")
     parser.add_argument("-e", "--num_epochs", type=int, default=300, help="Number of epochs.")
+    parser.add_argument("-val", "--validation_file", type=str, help="Path to the validation data file.")
+    parser.add_argument("-tc", "--training_curves", type=str, help="Path to save teh training curves figure.")
+    parser.add_argument("-wb", "--wandb_name", type=str, help="Name of this run to be logged in W&B.")
+
 
     return parser.parse_args()
 
@@ -39,12 +45,18 @@ def main():
     args = args_parser()
 
     data_file = args.training_file
+    val_file = args.validation_file
     blosum_file = args.blosum_file
     pseudoseqs_file = args.pseudoseqs_file
     syn_path = args.synapse_file
-
     batch_size = args.batch_size
-    SA_burn_in = args.burn_in_sa  #number of single-allele burn-in epochs
+    SA_burn_in = args.num_epochs  #number of single-allele burn-in epochs
+
+
+    wandb.init(
+    project="PyNNAlign_MA",
+    name=args.wandb_name,
+    config=vars(args))
     
     if torch.cuda.is_available():
         device = torch.device("cuda")
@@ -65,10 +77,13 @@ def main():
                                       blosum_matrix=blosum_matrix, 
                                       pseudoseqs_file=pseudoseqs_file)
     
-    #Initialize dataset
+    #Initialize training dataset
     dataset_class = NNAlign_MA_Dataset
     print(f"[3/4] Loading full dataset into RAM from {data_file}...")
     dataset_sa = dataset_class(file_path=data_file)
+
+    #Initialize validation dataset
+    dataset_val = dataset_class(file_path=val_file)
 
     #Initialize collator for batch construction
     collator = Collator_SA_Blosum_ClassII(blosum_matrix=blosum_matrix, aa_to_idx=aa_to_idx, pseudoseqs_dict=pseudoseqs_dict)
@@ -77,6 +92,14 @@ def main():
     loader_sa = DataLoader(dataset_sa, 
                            batch_size=batch_size, 
                            shuffle=True,
+                           num_workers=4, 
+                           collate_fn=collator, 
+                           pin_memory=pin_memory,
+                           persistent_workers=True)
+    
+    loader_val = DataLoader(dataset_val, 
+                           batch_size=batch_size * 5, 
+                           shuffle=False,
                            num_workers=4, 
                            collate_fn=collator, 
                            pin_memory=pin_memory,
@@ -95,13 +118,18 @@ def main():
                                  device=device,
                                  SA_burn_in=SA_burn_in,
                                  loader_ma=None,
-                                 loader_sa=loader_sa)
+                                 loader_sa=loader_sa,
+                                 loader_val=loader_val,
+                                 logger=wandb)
     
     #Train model and save learned weights
     trainer.train(num_epochs=args.num_epochs)
     print(f"[DONE] Saving weights to {syn_path}")
+
     trainer.save(syn_path=syn_path)
 
+    #Plot and save training curves
+    plot_training_curves(trainer=trainer, save_path=args.training_curves)
 
 if __name__ == "__main__":
     main()

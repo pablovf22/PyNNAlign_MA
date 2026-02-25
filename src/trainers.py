@@ -11,7 +11,7 @@ class NNAlign_MA_trainer:
     """
 
 
-    def __init__(self, model, criterion, optimizer, device, loader_ma, loader_sa, SA_burn_in):
+    def __init__(self, model, criterion, optimizer, device, loader_ma, loader_sa, loader_val, logger, SA_burn_in):
 
         self.model = model.to(device)  # move model to device
         self.criterion = criterion
@@ -19,9 +19,13 @@ class NNAlign_MA_trainer:
         self.device = device
         self.loader_ma = loader_ma
         self.loader_sa = loader_sa
+        self.loader_val = loader_val
         self.SA_burn_in = SA_burn_in
         self.MSE_train = []
         self.PCC_train = []
+        self.MSE_val = []
+        self.PCC_val = []
+        self.logger = logger
 
 
     def _train_one_epoch(self, loader):
@@ -47,17 +51,49 @@ class NNAlign_MA_trainer:
             batch_loss.backward()
             self.optimizer.step()
 
-        z_max_epoch = torch.cat(z_max_epoch, dim=0)
-        y_epoch = torch.cat(y_epoch, dim=0)
+        with torch.no_grad():
+            z_max_epoch = torch.cat(z_max_epoch, dim=0)
+            y_epoch = torch.cat(y_epoch, dim=0)
 
-        PCC_epoch = self._pcc_torch(z_max_epoch=z_max_epoch, y_epoch=y_epoch)
-        MSE_epoch = ((z_max_epoch - y_epoch) ** 2).mean().item()
+            PCC_epoch = self._pcc_torch(z_max_epoch=z_max_epoch, y_epoch=y_epoch)
+            MSE_epoch = ((z_max_epoch - y_epoch) ** 2).mean().item()
 
-        print(f"MSE: {MSE_epoch}  --  PCC: {PCC_epoch}")
+        print(f"MSE train: {MSE_epoch}  --  PCC train: {PCC_epoch}")
 
         self.MSE_train.append(MSE_epoch)
         self.PCC_train.append(PCC_epoch)
 
+
+    def _validate_one_epoch(self):
+
+        self.model.eval()
+
+        z_max_epoch = []
+        y_epoch = []
+
+        with torch.no_grad():
+
+            for batch in self.loader_val:
+
+                X, y, pep_idx = [tensor.to(self.device, non_blocking=True) for tensor in batch]
+                y = y.float()
+
+                z_max = self.model(X, pep_idx)
+
+                z_max_epoch.append(z_max)
+                y_epoch.append(y)
+
+            z_max_epoch = torch.cat(z_max_epoch, dim=0)
+            y_epoch = torch.cat(y_epoch, dim=0)
+
+            PCC_epoch = self._pcc_torch(z_max_epoch, y_epoch)
+            MSE_epoch = ((z_max_epoch - y_epoch) ** 2).mean().item()
+
+        print(f"MSE val: {MSE_epoch}  --  PCC val: {PCC_epoch}")
+
+        self.MSE_val.append(MSE_epoch)
+        self.PCC_val.append(PCC_epoch)
+        
         
     def train(self, num_epochs=300):
 
@@ -72,6 +108,14 @@ class NNAlign_MA_trainer:
 
             loader = self.loader_sa if epoch < self.SA_burn_in else self.loader_ma
             self._train_one_epoch(loader)
+            self._validate_one_epoch()
+
+            self.logger.log({
+                "MSE_train": self.MSE_train[-1],
+                "PCC_train": self.PCC_train[-1],
+                "MSE_val": self.MSE_val[-1],
+                "PCC_val": self.PCC_val[-1]
+                }, step=epoch+1)
 
 
     def save(self, syn_path):
@@ -89,5 +133,3 @@ class NNAlign_MA_trainer:
         denominator = torch.sqrt((x**2).sum()) * torch.sqrt((y**2).sum()) + eps
 
         return (numerator / denominator).item()
-
-
