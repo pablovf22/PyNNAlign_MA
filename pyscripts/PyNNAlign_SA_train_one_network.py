@@ -4,6 +4,7 @@ from pathlib import Path
 import torch
 from torch.utils.data import DataLoader
 import wandb
+import torch.nn as nn
 
 #Resolve project root directory (two levels up from this file)
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -31,10 +32,15 @@ def args_parser():
     parser.add_argument("-syn", "--synapse_file", type=str, help="Path to save the model weights.")
     parser.add_argument("-nh", "--n_hidden", type=int, default=56, help="Number of hidden neurons.")
     parser.add_argument("-lr", "--learning_rate", type=float, default=0.025, help="Learning rate.")
+    parser.add_argument("-wd", "--weight_decay", type=float, default=0, help="Weight decay.")
     parser.add_argument("-e", "--num_epochs", type=int, default=300, help="Number of epochs.")
     parser.add_argument("-val", "--validation_file", type=str, help="Path to the validation data file.")
-    parser.add_argument("-tc", "--training_curves", type=str, help="Path to save teh training curves figure.")
+    parser.add_argument("-tc", "--training_curves", type=str, help="Path to save the training curves figure.")
     parser.add_argument("-wb", "--wandb_name", type=str, help="Name of this run to be logged in W&B.")
+    parser.add_argument("-w", "--wandb_dir", type=str, help="The name of the directory to save wandb generated files.")
+    parser.add_argument("-a","--activation", choices=["relu","tanh"], default="tanh")
+    parser.add_argument("-c","--criterion",  choices=["bce","mse"],   default="mse")
+    parser.add_argument("-o","--optimizer",  choices=["adam","adamw","sgd"], default="sgd")
 
     return parser.parse_args()
 
@@ -49,12 +55,13 @@ def main():
     pseudoseqs_file = args.pseudoseqs_file
     syn_path = args.synapse_file
     batch_size = args.batch_size
-    SA_burn_in = args.num_epochs  #number of single-allele burn-in epochs
+    SA_burn_in = args.burn_in_sa #number of single-allele burn-in epochs
 
 
     run = wandb.init(project="PyNNAlign_MA",
                      name=args.wandb_name,
-                     config=vars(args))
+                     config=vars(args),
+                     dir=args.wandb_dir)
     
     if torch.cuda.is_available():
         device = torch.device("cuda")
@@ -103,12 +110,35 @@ def main():
                            pin_memory=pin_memory,
                            persistent_workers=True)
     
+    ACTIVATION_FACTORY = {
+        "relu": nn.ReLU(),
+        "tanh": nn.Tanh()}
+    
+    activation = ACTIVATION_FACTORY[args.activation]
+    
     print(f"[MODEL] Initializing NNAlign_SA architecture...")
-    model = NNAlign_MA(n_hidden=args.n_hidden)
+    model = NNAlign_MA(n_hidden=args.n_hidden,
+                       activation = activation)
 
-    criterion = torch.nn.MSELoss()
+    CRITERION_FACTORY = {
+        "bce": nn.BCELoss(),
+        "mse": nn.MSELoss()}
+
+    criterion = CRITERION_FACTORY[args.criterion]
+
     lr = args.learning_rate
-    optimizer = torch.optim.SGD(model.parameters(), lr=lr)
+    wd = args.weight_decay
+
+    OPTIMIZER_FACTORY = {
+        "adam": lambda p, lr, wd: torch.optim.Adam(p, lr=lr, weight_decay=wd),
+        "adamw": lambda p, lr, wd: torch.optim.AdamW(p, lr=lr, weight_decay=wd),
+        "sgd": lambda p, lr, wd: torch.optim.SGD(p, lr=lr, weight_decay=wd)}
+
+    optimizer = OPTIMIZER_FACTORY[args.optimizer](
+        model.parameters(),
+        lr,
+        wd
+    )
 
     trainer = NNAlign_MA_trainer(model=model, 
                                  criterion=criterion,

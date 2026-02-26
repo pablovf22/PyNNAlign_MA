@@ -19,7 +19,7 @@ class NNAlign_MA(nn.Module):
     """
 
 
-    def __init__(self, n_hidden=56, aa_embedding_dim=24, window_size=9, pseudoseq_size=34):
+    def __init__(self, activation, n_hidden=56, aa_embedding_dim=24, window_size=9, pseudoseq_size=34):
 
         super(NNAlign_MA, self).__init__()
         self.aa_embedding_dim = aa_embedding_dim
@@ -28,7 +28,7 @@ class NNAlign_MA(nn.Module):
         self.n_hidden = n_hidden
         self.in_layer = nn.Linear((self.window_size + self.pseudoseq_size) * self.aa_embedding_dim, n_hidden)
         self.out_layer = nn.Linear(n_hidden, 1)
-        self.activation = nn.Tanh()
+        self.activation = activation
 
 
     def forward(self, X_tensor, group, batch_size=None):
