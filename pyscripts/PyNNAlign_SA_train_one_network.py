@@ -118,11 +118,17 @@ def main():
     
     print(f"[MODEL] Initializing NNAlign_SA architecture...")
     model = NNAlign_MA(n_hidden=args.n_hidden,
-                       activation = activation)
+                       activation = activation,
+                       logits=logits)
 
     CRITERION_FACTORY = {
-        "bce": nn.BCELoss(),
+        "bce": nn.BCEWithLogitsLoss(),
         "mse": nn.MSELoss()}
+    
+    if args.criterion == "bce":
+        logits = True
+    else:
+        logits = False
 
     criterion = CRITERION_FACTORY[args.criterion]
 

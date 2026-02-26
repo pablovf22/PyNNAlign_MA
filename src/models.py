@@ -19,7 +19,7 @@ class NNAlign_MA(nn.Module):
     """
 
 
-    def __init__(self, activation, n_hidden=56, aa_embedding_dim=24, window_size=9, pseudoseq_size=34):
+    def __init__(self, activation, n_hidden=56, aa_embedding_dim=24, window_size=9, pseudoseq_size=34, logits=False):
 
         super(NNAlign_MA, self).__init__()
         self.aa_embedding_dim = aa_embedding_dim
@@ -29,6 +29,7 @@ class NNAlign_MA(nn.Module):
         self.in_layer = nn.Linear((self.window_size + self.pseudoseq_size) * self.aa_embedding_dim, n_hidden)
         self.out_layer = nn.Linear(n_hidden, 1)
         self.activation = activation
+        self.logits = logits
 
 
     def forward(self, X_tensor, group, batch_size=None):
@@ -42,7 +43,8 @@ class NNAlign_MA(nn.Module):
         z = self.in_layer(X_tensor)
         z = self.activation(z)
         z = self.out_layer(z).squeeze(-1)       #From a 2d tensor to a 1d tensor, the embedding results in a loggit
-        z = torch.sigmoid(z)
+        if not self.logits:
+            z = torch.sigmoid(z)
 
         #Create a batch size vector and then fill it with the maximum loggit in each group (peptide)
         z_max = torch.full((batch_size,), float("-inf"), device=z.device, dtype=z.dtype) 
