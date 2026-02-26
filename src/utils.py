@@ -6,30 +6,32 @@ def plot_training_curves(trainer, save_path=None):
 
     epochs = np.arange(1, len(trainer.MSE_train) + 1)
 
-    plt.style.use("seaborn-darkgrid")
-
-    fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+    fig, axes = plt.subplots(1, 2, figsize=(12, 4.5), dpi=120)
 
     # ---- MSE ----
-    axes[0].plot(epochs, trainer.MSE_train, label="Train", linewidth=2)
-    axes[0].plot(epochs, trainer.MSE_val, label="Validation", linewidth=2)
-    axes[0].set_xlabel("Epoch")
-    axes[0].set_ylabel("MSE")
-    axes[0].set_title("Mean Squared Error")
-    axes[0].legend()
+    ax = axes[0]
+    ax.plot(epochs, trainer.MSE_train, label="Train", linewidth=2)
+    ax.plot(epochs, trainer.MSE_val, label="Validation", linewidth=2)
+    ax.set_title("Loss")
+    ax.set_xlabel("Epoch")
+    ax.set_ylabel("Loss")
+    ax.grid(True, linewidth=0.5, alpha=0.4)
+    ax.legend(frameon=False)
 
     # ---- PCC ----
-    axes[1].plot(epochs, trainer.PCC_train, label="Train", linewidth=2)
-    axes[1].plot(epochs, trainer.PCC_val, label="Validation", linewidth=2)
-    axes[1].set_xlabel("Epoch")
-    axes[1].set_ylabel("PCC")
-    axes[1].set_title("Pearson Correlation Coefficient")
-    axes[1].legend()
+    ax = axes[1]
+    ax.plot(epochs, trainer.PCC_train, label="Train", linewidth=2)
+    ax.plot(epochs, trainer.PCC_val, label="Validation", linewidth=2)
+    ax.set_title("PCC")
+    ax.set_xlabel("Epoch")
+    ax.set_ylabel("PCC")
+    ax.grid(True, linewidth=0.5, alpha=0.4)
+    ax.legend(frameon=False)
 
-    fig.suptitle("Training Curves", fontsize=14)
+    fig.suptitle("Training Curves", y=1.02, fontsize=12)
     fig.tight_layout()
 
     if save_path is not None:
-        plt.savefig(save_path, dpi=300, bbox_inches="tight")
+        plt.savefig(save_path, dpi=200, bbox_inches="tight")
 
-    plt.show()
+    plt.close(fig)
