@@ -21,9 +21,9 @@ class NNAlign_MA_trainer:
         self.loader_sa = loader_sa
         self.loader_val = loader_val
         self.SA_burn_in = SA_burn_in
-        self.MSE_train = []
+        self.Loss_train = []
         self.PCC_train = []
-        self.MSE_val = []
+        self.Loss_val = []
         self.PCC_val = []
         self.logger = logger
 
@@ -56,11 +56,11 @@ class NNAlign_MA_trainer:
             y_epoch = torch.cat(y_epoch, dim=0)
 
             PCC_epoch = self._pcc_torch(z_max_epoch=z_max_epoch, y_epoch=y_epoch)
-            MSE_epoch = ((z_max_epoch - y_epoch) ** 2).mean().item()
+            Loss_epoch = self.criterion(z_max_epoch, y_epoch).item()
 
-        print(f"MSE train: {MSE_epoch}  --  PCC train: {PCC_epoch}")
+        print(f"Loss train: {Loss_epoch}  --  PCC train: {PCC_epoch}")
 
-        self.MSE_train.append(MSE_epoch)
+        self.Loss_train.append(Loss_epoch)
         self.PCC_train.append(PCC_epoch)
 
 
@@ -86,11 +86,11 @@ class NNAlign_MA_trainer:
             y_epoch = torch.cat(y_epoch, dim=0)
 
             PCC_epoch = self._pcc_torch(z_max_epoch, y_epoch)
-            MSE_epoch = ((z_max_epoch - y_epoch) ** 2).mean().item()
+            Loss_epoch = self.criterion(z_max_epoch, y_epoch).item()
 
-        print(f"MSE val: {MSE_epoch}  --  PCC val: {PCC_epoch}")
+        print(f"Loss val: {Loss_epoch}  --  PCC val: {PCC_epoch}")
 
-        self.MSE_val.append(MSE_epoch)
+        self.Loss_val.append(Loss_epoch)
         self.PCC_val.append(PCC_epoch)
         
         
@@ -111,9 +111,9 @@ class NNAlign_MA_trainer:
 
             if self.logger is not None:
                 self.logger.log({
-                    "MSE_train": self.MSE_train[-1],
+                    "Loss_train": self.Loss_train[-1],
                     "PCC_train": self.PCC_train[-1],
-                    "MSE_val": self.MSE_val[-1],
+                    "Loss_val": self.Loss_val[-1],
                     "PCC_val": self.PCC_val[-1]
                     }, step=epoch+1)
 
