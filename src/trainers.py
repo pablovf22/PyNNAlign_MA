@@ -120,7 +120,7 @@ class NNAlign_MA_trainer:
 
     def save(self, syn_path):
 
-        torch.save(self.model.state_dict(), syn_path)  # save model weights
+        torch.save(self.model.state_dict(), syn_path)  #save model weights
 
 
     @staticmethod
