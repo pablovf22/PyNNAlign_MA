@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+from torch_scatter import scatter_max
 
 class NNAlign_MA(nn.Module):
 
@@ -31,21 +32,31 @@ class NNAlign_MA(nn.Module):
         self.activation = activation
 
 
-    def forward(self, X_tensor, group, batch_size=None):
+    def forward(self, X_tensor, group):
 
         if group.dtype != torch.long:
             group = group.long()
-
-        if batch_size is None:
-            batch_size = int(group.max().item()) + 1
 
         z = self.in_layer(X_tensor)
         z = self.activation(z)
         z = self.out_layer(z).squeeze(-1)       #From a 2d tensor to a 1d tensor, the embedding results in a loggit
         z = torch.sigmoid(z)
 
-        #Create a batch size vector and then fill it with the maximum loggit in each group (peptide)
-        z_max = torch.full((batch_size,), float("-inf"), device=z.device, dtype=z.dtype) 
-        z_max = torch.scatter_reduce(z_max, 0, group, z, reduce="amax", include_self=True)
+        z_max, idx_max = scatter_max(z, group)  #Per group max pooling
         
-        return z_max   
+        return z_max 
+
+
+    def inference(self, X_tensor, group):
+
+        if group.dtype != torch.long:
+            group = group.long()
+
+        z = self.in_layer(X_tensor)
+        z = self.activation(z)
+        z = self.out_layer(z).squeeze(-1)       #From a 2d tensor to a 1d tensor, the embedding results in a loggit
+        z = torch.sigmoid(z)
+
+        z_max, idx_max = scatter_max(z, group)  #Per group max pooling
+        
+        return z_max, idx_max

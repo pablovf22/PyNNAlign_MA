@@ -39,7 +39,7 @@ class NNAlign_MA_trainer:
             
             self.optimizer.zero_grad(set_to_none=True)
 
-            # move batch tensors to device
+            #move batch tensors to device
             X, y, pep_idx = [tensor.to(self.device, non_blocking=True) for tensor in batch]
 
             z_max = self.model(X, pep_idx)

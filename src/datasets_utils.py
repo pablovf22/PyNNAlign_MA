@@ -63,7 +63,6 @@ def load_pseudoseqs(pseudoseqs_file, aa_to_idx, blosum_matrix):
     return pseudoseqs_dict
 
 
-
 class Collator_MA_Blosum:
     """
     Base collator implementing the common batching pipeline for MHC peptide data.
@@ -168,7 +167,6 @@ class Collator_MA_Blosum:
         return X, y, pep_idx
 
 
-
 class Collator_MA_Blosum_ClassII(Collator_MA_Blosum):
     """
     Collator for MHC class II peptides.
@@ -219,3 +217,43 @@ class Collator_SA_Blosum_ClassII(Collator_MA_Blosum_ClassII):
             pep_idx_list.append(pep_idx)
 
         return self._finalize_batch(X_list, y_list, pep_idx_list)
+    
+
+class Collator_SA_Blosum_ClassII_Inference(Collator_SA_Blosum_ClassII):
+    
+
+    def __call__(self, batch):
+
+        X_list, y_list, pep_idx_list, pep_list, comb_list = [], [], [], [], []
+        E = self.blosum_matrix.size(0)
+
+        for pep_i, (peptide, label, allele) in enumerate(batch):
+
+            windows_embedding, W = self._encode_windows(peptide, E)
+            pseudoseqs_tensor = self.pseudoseqs_dict[allele].unsqueeze(0) 
+
+            X = self._combine_window_pseudoseq(
+                windows_embedding, pseudoseqs_tensor, W, 1
+            )
+            y, pep_idx = self._make_targets_idx(label, pep_i, W, 1)
+            pep_comb = self._get_raw_combinations(peptide, allele)
+
+            X_list.append(X)
+            y_list.append(y)
+            pep_idx_list.append(pep_idx)
+            pep_list.append(peptide)
+            comb_list.extend(pep_comb)
+
+        return self._finalize_batch(X_list, y_list, pep_idx_list), pep_list, comb_list
+    
+
+    def _get_raw_combinations(self, peptide, allele):
+
+        comb_list = []
+
+        for i in range(len(peptide)-9+1):
+
+            core = peptide[i:i+9]
+            comb_list.append([core,allele])
+
+        return comb_list
