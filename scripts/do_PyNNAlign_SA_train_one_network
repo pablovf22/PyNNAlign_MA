@@ -25,12 +25,12 @@ mkdir -p "$PROJECT_ROOT/outputs/wandb/$RUN_ID"
 WB_DIR="$PROJECT_ROOT/outputs/wandb/$RUN_ID"
 
 BATCH_SIZE=256
-BURN_IN_SA=100
+BURN_IN_SA=300
 N_HIDDEN=56
-LEARNING_RATE=0.0003
-EPOCHS=100
-ACTIVATION="relu"
-CRITERION="bce"
+LEARNING_RATE=0.001
+EPOCHS=300
+ACTIVATION="sig"
+CRITERION="mse"
 OPTIMIZER="sgd"
 
 
@@ -42,7 +42,7 @@ conda activate "$ENV"
 START_TIME=$(date +%s)
 
 
-python pyscripts/PyNNAlign_SA_train_one_network.py -b "$BATCH_SIZE" -sa "$BURN_IN_SA" -tr "$TRAIN_EL" -bl "$BLF" -ps "$PSEUDO" -syn "$SYN" -nh "$N_HIDDEN" -lr "$LEARNING_RATE" -e "$EPOCHS" -val "$VAL_EL" -tc "$TRAINING_CURVES" -wb "$RUN_ID" -w "$WB_DIR" -a $ACTIVATION -c "$CRITERION" -o "$OPTIMIZER" > "$PROJECT_ROOT/outputs/logs/$RUN_ID.log" 2>&1
+python pyscripts/PyNNAlign_SA_train_one_network.py -b "$BATCH_SIZE" -sa "$BURN_IN_SA" -tr "$TRAIN_EL" -bl "$BLF" -ps "$PSEUDO" -syn "$SYN" -nh "$N_HIDDEN" -lr "$LEARNING_RATE" -e "$EPOCHS" -val "$VAL_EL" -tc "$TRAINING_CURVES" -wb "$RUN_ID" -w "$WB_DIR" -a "$ACTIVATION" -c "$CRITERION" -o "$OPTIMIZER" > "$PROJECT_ROOT/outputs/logs/$RUN_ID.log" 2>&1
 
 
 END_TIME=$(date +%s)

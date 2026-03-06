@@ -38,7 +38,7 @@ def args_parser():
     parser.add_argument("-tc", "--training_curves", type=str, help="Path to save the training curves figure.")
     parser.add_argument("-wb", "--wandb_name", type=str, help="Name of this run to be logged in W&B.")
     parser.add_argument("-w", "--wandb_dir", type=str, help="The name of the directory to save wandb generated files.")
-    parser.add_argument("-a","--activation", choices=["relu","tanh"], default="tanh")
+    parser.add_argument("-a","--activation", choices=["relu","tanh", "sig"], default="tanh")
     parser.add_argument("-c","--criterion",  choices=["bce","mse"],   default="mse")
     parser.add_argument("-o","--optimizer",  choices=["adam","adamw","sgd"], default="sgd")
 
@@ -55,10 +55,10 @@ def main():
     pseudoseqs_file = args.pseudoseqs_file
     syn_path = args.synapse_file
     batch_size = args.batch_size
-    SA_burn_in = args.burn_in_sa #number of single-allele burn-in epochs
+    SA_burn_in = args.burn_in_sa  
 
 
-    run = wandb.init(project="PyNNAlign_MA",
+    logger = wandb.init(project="PyNNAlign_MA",
                      name=args.wandb_name,
                      config=vars(args),
                      dir=args.wandb_dir)
@@ -66,7 +66,6 @@ def main():
     if torch.cuda.is_available():
         device = torch.device("cuda")
         pin_memory = True
-
     else:
         device = torch.device("cpu")
         pin_memory = False
@@ -83,7 +82,7 @@ def main():
                                       pseudoseqs_file=pseudoseqs_file)
     
     #Initialize training dataset
-    dataset_class = NNAlign_MA_Dataset
+    dataset_class = NNAlign_MA_Dataset             #MA dataset works for this SA setup, we only have to use a different collator_fn
     print(f"[3/4] Loading full dataset into RAM from {data_file}...")
     dataset_sa = dataset_class(file_path=data_file)
 
@@ -110,42 +109,46 @@ def main():
                            pin_memory=pin_memory,
                            persistent_workers=True)
     
+    #Activation funtion options
     ACTIVATION_FACTORY = {
         "relu": nn.ReLU(),
-        "tanh": nn.Tanh()}
+        "tanh": nn.Tanh(),
+        "sig": nn.Sigmoid()}
     
+    #Define the activation funtion
     activation = ACTIVATION_FACTORY[args.activation]
     
+    #Initilize model
     print(f"[MODEL] Initializing NNAlign_SA architecture...")
-    if args.criterion == "bce":
-        logits = True
-    else:
-        logits = False
-
     model = NNAlign_MA(n_hidden=args.n_hidden,
-                       activation = activation,
-                       logits=logits)
+                       activation = activation)
 
+    #Criterion options
     CRITERION_FACTORY = {
-        "bce": nn.BCEWithLogitsLoss(),
+        "bce": nn.BCELoss(),
         "mse": nn.MSELoss()}
 
+    #Define criterion
     criterion = CRITERION_FACTORY[args.criterion]
 
+    #Optimizer hyperparameters
     lr = args.learning_rate
     wd = args.weight_decay
 
+    #Optimizer options
     OPTIMIZER_FACTORY = {
         "adam": lambda p, lr, wd: torch.optim.Adam(p, lr=lr, weight_decay=wd),
         "adamw": lambda p, lr, wd: torch.optim.AdamW(p, lr=lr, weight_decay=wd),
         "sgd": lambda p, lr, wd: torch.optim.SGD(p, lr=lr, weight_decay=wd)}
 
+    #Define optimizer
     optimizer = OPTIMIZER_FACTORY[args.optimizer](
         model.parameters(),
         lr,
         wd
     )
 
+    #Initilize trainer
     trainer = NNAlign_MA_trainer(model=model, 
                                  criterion=criterion,
                                  optimizer=optimizer,
@@ -154,7 +157,7 @@ def main():
                                  loader_ma=loader_sa,
                                  loader_sa=loader_sa,
                                  loader_val=loader_val,
-                                 logger=run)
+                                 logger=logger)
     
     #Train model and save learned weights
     trainer.train(num_epochs=args.num_epochs)

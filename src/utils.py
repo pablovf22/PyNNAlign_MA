@@ -4,14 +4,14 @@ import numpy as np
 
 def plot_training_curves(trainer, save_path=None):
 
-    epochs = np.arange(1, len(trainer.MSE_train) + 1)
+    epochs = np.arange(1, len(trainer.Loss_train) + 1)
 
     fig, axes = plt.subplots(1, 2, figsize=(12, 4.5), dpi=120)
 
     # ---- MSE ----
     ax = axes[0]
-    ax.plot(epochs, trainer.MSE_train, label="Train", linewidth=2)
-    ax.plot(epochs, trainer.MSE_val, label="Validation", linewidth=2)
+    ax.plot(epochs, trainer.Loss_train, label="Train", linewidth=2)
+    ax.plot(epochs, trainer.Loss_val, label="Validation", linewidth=2)
     ax.set_title("Loss")
     ax.set_xlabel("Epoch")
     ax.set_ylabel("Loss")
