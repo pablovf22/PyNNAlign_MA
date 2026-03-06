@@ -26,7 +26,6 @@ def args_parser():
     parser.add_argument("-bl", "--blosum_file", type=str, help="Path to the blosum file.")
     parser.add_argument("-ps", "--pseudoseqs_file", type=str, help="Path to the pseudoseqs file.")
     parser.add_argument("-syn", "--synapse_file", type=str, help="Path to the file with model weights.")
-    parser.add_argument("-nh", "--n_hidden", type=int, default=56, help="Number of hidden neurons.")
     parser.add_argument("-a","--activation", choices=["relu","tanh", "sig"], default="tanh")
     parser.add_argument("-p", "--pred_file", type=str, help="Path to save the predictions.")
 
@@ -76,10 +75,12 @@ def main():
     activation = ACTIVATION_FACTORY[args.activation]
 
     #Initialize model
-    model = NNAlign_MA(n_hidden=args.n_hidden,
+    checkpoint = torch.load(args.synapse_file, map_location=device)
+
+    model = NNAlign_MA(n_hidden=checkpoint["n_hidden"],
                        activation = activation)
     
-    model.load_state_dict(torch.load(args.synapse_file, map_location=device))
+    model.load_state_dict(checkpoint["model_state_dict"])
     model.to(device)
     model.eval()
 
