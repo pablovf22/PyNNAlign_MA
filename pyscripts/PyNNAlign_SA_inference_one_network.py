@@ -36,6 +36,8 @@ def main():
 
     args = args_parser()
 
+    print("\n[INFO] Starting inference script")
+
     #Setting available device
     if torch.cuda.is_available():
         device = torch.device("cuda")
@@ -44,54 +46,82 @@ def main():
         device = torch.device("cpu")
         pin_memory = False
 
+    print(f"[INFO] Using device: {device}")
+
     #Loading preprocessing resouces
+    print("[INFO] Loading BLOSUM matrix...")
     blosum_matrix, aa_to_idx = load_blosum(blosum_file=args.blosum_file)
 
-    pseudoseqs_dict = load_pseudoseqs(aa_to_idx=aa_to_idx,
-                                      blosum_matrix=blosum_matrix, 
-                                      pseudoseqs_file=args.pseudoseqs_file)
+    print("[INFO] Loading pseudosequences...")
+    pseudoseqs_dict = load_pseudoseqs(
+        aa_to_idx=aa_to_idx,
+        blosum_matrix=blosum_matrix, 
+        pseudoseqs_file=args.pseudoseqs_file
+    )
     
     #Initialize inference dataset
-    dataset = NNAlign_MA_Dataset(file_path=args.data_file) 
+    print("[INFO] Loading dataset...")
+    dataset = NNAlign_MA_Dataset(file_path=args.data_file)
+    print(f"[INFO] Dataset size: {len(dataset)} peptides")
 
     #Initialize collator for batch construction
-    collator = Collator_SA_Blosum_ClassII_Inference(blosum_matrix=blosum_matrix, aa_to_idx=aa_to_idx, pseudoseqs_dict=pseudoseqs_dict)
+    collator = Collator_SA_Blosum_ClassII_Inference(
+        blosum_matrix=blosum_matrix,
+        aa_to_idx=aa_to_idx,
+        pseudoseqs_dict=pseudoseqs_dict
+    )
 
     #Initialize dataloader
-    loader = DataLoader(dataset, 
-                        batch_size=args.batch_size,
-                        shuffle=False,
-                        num_workers=0,
-                        collate_fn=collator,
-                        pin_memory=pin_memory)
-    
+    loader = DataLoader(
+        dataset, 
+        batch_size=args.batch_size,
+        shuffle=False,
+        num_workers=0,
+        collate_fn=collator,
+        pin_memory=pin_memory
+    )
+
+    print(f"[INFO] Batch size: {args.batch_size}")
+    print(f"[INFO] Number of batches: {len(loader)}")
+
     #Activation funtion options
     ACTIVATION_FACTORY = {
         "relu": nn.ReLU(),
         "tanh": nn.Tanh(),
-        "sig": nn.Sigmoid()}
+        "sig": nn.Sigmoid()
+    }
     
-    #Define the activation funtion
     activation = ACTIVATION_FACTORY[args.activation]
 
     #Initialize model
+    print("[INFO] Loading model checkpoint...")
     checkpoint = torch.load(args.synapse_file, map_location=device)
 
-    model = NNAlign_MA(n_hidden=checkpoint["n_hidden"],
-                       activation = activation)
+    model = NNAlign_MA(
+        n_hidden=checkpoint["n_hidden"],
+        activation=activation
+    )
     
     model.load_state_dict(checkpoint["model_state_dict"])
     model.to(device)
     model.eval()
 
+    print("[INFO] Model loaded successfully")
+    print("[INFO] Starting inference...\n")
+
+    processed = 0
+
     with torch.no_grad():
 
         with open(args.pred_file, "w") as outfile:
 
-            for batch in loader:
+            for batch_idx, batch in enumerate(loader):
 
                 #move batch tensors to device
-                X, y, pep_idx = [tensor.to(device, non_blocking=True) for tensor in batch[0]]
+                X, y, pep_idx = batch[0]
+                X = X.to(device, non_blocking=True)
+                pep_idx = pep_idx.to(device, non_blocking=True)
+
                 pep_list, comb_list = batch[1:]
 
                 z_max, idx_max = model.inference(X, pep_idx)
@@ -103,7 +133,20 @@ def main():
                 comb_max_list = [comb_list[i] for i in idx_max]
 
                 for i in range(len(pep_list)):
-                    print(f"{pep_list[i]}\t{comb_max_list[i][0]}\t{y[i]}\t{z_max[i]}\t{comb_max_list[i][1]}", file=outfile)
+                    print(
+                        f"{pep_list[i]}\t{comb_max_list[i][0]}\t{y[i]}\t{z_max[i]}\t{comb_max_list[i][1]}",
+                        file=outfile
+                    )
+
+                processed += len(pep_list)
+
+                #Print progress every 10 batches
+                if batch_idx % 10 == 0:
+                    print(f"[INFO] Batch {batch_idx+1}/{len(loader)} processed | peptides processed: {processed}")
+
+    print("\n[INFO] Inference completed")
+    print(f"[INFO] Total peptides processed: {processed}")
+    print(f"[INFO] Predictions saved to: {args.pred_file}")
 
 
 if __name__ == "__main__":
