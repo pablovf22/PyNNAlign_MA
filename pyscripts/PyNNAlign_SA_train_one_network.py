@@ -14,9 +14,9 @@ PROJECT_ROOT_STR = str(PROJECT_ROOT)
 if PROJECT_ROOT_STR not in sys.path:
     sys.path.insert(0, PROJECT_ROOT_STR)
 
-from src.models import NNAlign_MA
+from src.models import NNAlign_MA, NNAlign_MA_Extra_Features
 from src.datasets import NNAlign_MA_Dataset
-from src.datasets_utils import Collator_SA_Blosum_ClassII, load_blosum, load_pseudoseqs
+from src.datasets_utils import Collator_SA_Blosum_ClassII, Collator_SA_Blosum_ClassII_Extra_Features, load_blosum, load_pseudoseqs, load_blosum_freq_rownorm
 from src.trainers import NNAlign_MA_trainer
 from src.utils import plot_training_curves
 
@@ -41,6 +41,9 @@ def args_parser():
     parser.add_argument("-a","--activation", choices=["relu","tanh", "sig"], default="tanh")
     parser.add_argument("-c","--criterion",  choices=["bce","mse"],   default="mse")
     parser.add_argument("-o","--optimizer",  choices=["adam","adamw","sgd"], default="sgd")
+    parser.add_argument("-ft", "--extra_features", action="store_true", help="Enable extra peptide-context features (PFR composition, peptide length and PFR length encodings).")
+    parser.add_argument("-blf", "--blosum_freq_file", type=str, help="Path to the blosum file freq rownorm.")
+    parser.add_argument("-pl", "--peptide_lengths", type=int, nargs=2, default=[12, 19], metavar=("MIN", "MAX"), help="Allowed peptide length range for length encoding.")
 
     return parser.parse_args()
 
@@ -82,15 +85,19 @@ def main():
                                       pseudoseqs_file=pseudoseqs_file)
     
     #Initialize training dataset
-    dataset_class = NNAlign_MA_Dataset             #MA dataset works for this SA setup, we only have to use a different collator_fn
-    print(f"[3/4] Loading full dataset into RAM from {data_file}...")
-    dataset_sa = dataset_class(file_path=data_file)
+           
+    print(f"[3/4] Loading full dataset into RAM from {data_file}...") 
+    dataset_sa = NNAlign_MA_Dataset(file_path=data_file, min_length=args.peptide_lengths[0])              #MA dataset works for this SA setup, we only have to use a different collator_fn
 
     #Initialize validation dataset
-    dataset_val = dataset_class(file_path=val_file)
+    dataset_val = NNAlign_MA_Dataset(file_path=val_file, min_length=args.peptide_lengths[0])
 
     #Initialize collator for batch construction
-    collator = Collator_SA_Blosum_ClassII(blosum_matrix=blosum_matrix, aa_to_idx=aa_to_idx, pseudoseqs_dict=pseudoseqs_dict)
+    if args.extra_features:
+        blosum_matrix_freq, aa_to_idx_freq = load_blosum_freq_rownorm(blosum_file=args.blosum_freq_file)
+        collator = Collator_SA_Blosum_ClassII_Extra_Features(blosum_matrix=blosum_matrix, aa_to_idx=aa_to_idx, pseudoseqs_dict=pseudoseqs_dict, blosum_matrix_freq=blosum_matrix_freq, aa_to_idx_freq=aa_to_idx_freq, min_length=args.peptide_lengths[0], max_length=args.peptide_lengths[1])
+    else:
+        collator = Collator_SA_Blosum_ClassII(blosum_matrix=blosum_matrix, aa_to_idx=aa_to_idx, pseudoseqs_dict=pseudoseqs_dict)
 
     #Initialize dataloaders
     loader_sa = DataLoader(dataset_sa, 
@@ -120,8 +127,14 @@ def main():
     
     #Initilize model
     print(f"[MODEL] Initializing NNAlign_SA architecture...")
-    model = NNAlign_MA(n_hidden=args.n_hidden,
-                       activation = activation)
+    if args.extra_features:
+        model = NNAlign_MA_Extra_Features(
+            n_hidden=args.n_hidden,
+            activation=activation
+        )
+    else:
+        model = NNAlign_MA(n_hidden=args.n_hidden,
+                        activation = activation)
 
     #Criterion options
     CRITERION_FACTORY = {

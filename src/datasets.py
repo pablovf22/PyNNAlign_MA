@@ -128,11 +128,12 @@ class NNAlign_MA_Dataset(Dataset):
     tuples.
     """
 
-    def __init__(self, file_path):
+    def __init__(self, file_path, min_length):
 
         super(NNAlign_MA_Dataset, self).__init__()
 
         self.dataset = []  # Stores all samples in memory
+        self.min_length = min_length
 
         # Load and optionally filter samples
         with open(file_path, "r") as infile:
@@ -141,6 +142,9 @@ class NNAlign_MA_Dataset(Dataset):
 
                 # Parse first three whitespace-separated fields
                 peptide, label, cell_line = line.strip().split()[:3]
+
+                assert len(peptide) >= self.min_length, \
+                    f"Peptide '{peptide}' has length {len(peptide)}, which is shorter than the minimum allowed ({self.min_length})."
 
                 # Store sample as (peptide, int label, cell_line)
                 self.dataset.append((peptide, int(float(label)), cell_line))

@@ -1,14 +1,15 @@
 #!/bin/bash
-#SBATCH --job-name=PyNNAlign_SA_HLA-DR_04_060326
+#SBATCH --job-name=PyNNAlign_SA_Extra_Features_HLA-DR_01_090326
 #SBATCH --output=/home/projects2/s243357/master_thesis/PyNNAlign_MA/outputs/logs/slurm-%x.out
 #SBATCH --error=/home/projects2/s243357/master_thesis/PyNNAlign_MA/outputs/logs/slurm-%x.err
 #SBATCH --nodes=1
 #SBATCH --partition=gpu
-#SBATCH --mem=15GB
+#SBATCH --gres=gpu:1
+#SBATCH --mem=20GB
 #SBATCH --cpus-per-task=4
 #SBATCH --time=24:00:00
 
-RUN_ID="PyNNAlign_SA_HLA-DR_04_060326"
+RUN_ID="PyNNAlign_SA_Extra_Features_HLA-DR_01_090326"
 
 ENV="PyNNAlign_MA"
 
@@ -17,6 +18,7 @@ TRAIN_EL="$PROJECT_ROOT/data/f000_el_hla_dr"
 VAL_EL="$PROJECT_ROOT/data/c000_el_hla_dr"
 PSEUDO="$PROJECT_ROOT/data/pseudosequence.2023.dat"
 BLF="$PROJECT_ROOT/data/BLOSUM50"
+BLF_PFR="$PROJECT_ROOT/data/blosum62.freq_rownorm"
 SYN="$PROJECT_ROOT/models/$RUN_ID.pt"
 TRAINING_CURVES="$PROJECT_ROOT/outputs/plots/$RUN_ID.png"
 
@@ -27,7 +29,7 @@ WB_DIR="$PROJECT_ROOT/outputs/wandb/$RUN_ID"
 BATCH_SIZE=256
 BURN_IN_SA=300
 N_HIDDEN=56
-LEARNING_RATE=0.05
+LEARNING_RATE=0.001
 EPOCHS=300
 ACTIVATION="sig"
 CRITERION="mse"
@@ -42,10 +44,10 @@ conda activate "$ENV"
 START_TIME=$(date +%s)
 
 
-python pyscripts/PyNNAlign_SA_train_one_network.py -b "$BATCH_SIZE" -sa "$BURN_IN_SA" -tr "$TRAIN_EL" -bl "$BLF" -ps "$PSEUDO" -syn "$SYN" -nh "$N_HIDDEN" -lr "$LEARNING_RATE" -e "$EPOCHS" -val "$VAL_EL" -tc "$TRAINING_CURVES" -wb "$RUN_ID" -w "$WB_DIR" -a "$ACTIVATION" -c "$CRITERION" -o "$OPTIMIZER" > "$PROJECT_ROOT/outputs/logs/$RUN_ID.log" 2>&1
+python pyscripts/PyNNAlign_SA_train_one_network.py -b "$BATCH_SIZE" -sa "$BURN_IN_SA" -tr "$TRAIN_EL" -bl "$BLF" -ps "$PSEUDO" -syn "$SYN" -nh "$N_HIDDEN" -lr "$LEARNING_RATE" -e "$EPOCHS" -val "$VAL_EL" -tc "$TRAINING_CURVES" -wb "$RUN_ID" -w "$WB_DIR" -a "$ACTIVATION" -c "$CRITERION" -o "$OPTIMIZER" -ft -blf "$BLF_PFR" > "$PROJECT_ROOT/outputs/logs/$RUN_ID.log" 2>&1
 
 
 END_TIME=$(date +%s)
 ELAPSED=$((END_TIME - START_TIME))
 
-echo "Total runtime (seconds): $ELAPSED"on 
+echo "Total runtime (seconds): $ELAPSED"
