@@ -22,7 +22,7 @@ def args_parser():
 
     parser = argparse.ArgumentParser(description="Inference with one NNAlign_MA-like model.")
     parser.add_argument("-b", "--batch_size", type=int, default=100, help="Batch size (number of samples per inference step).")
-    parser.add_argument("-tr", "--data_file", type=str, help="Path to the inference data file.")
+    parser.add_argument("-f", "--data_file", type=str, help="Path to the inference data file.")
     parser.add_argument("-bl", "--blosum_file", type=str, help="Path to the blosum file.")
     parser.add_argument("-ps", "--pseudoseqs_file", type=str, help="Path to the pseudoseqs file.")
     parser.add_argument("-syn", "--synapse_file", type=str, help="Path to the file with model weights.")
