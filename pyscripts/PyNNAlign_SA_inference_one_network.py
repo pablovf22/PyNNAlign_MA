@@ -13,9 +13,9 @@ PROJECT_ROOT_STR = str(PROJECT_ROOT)
 if PROJECT_ROOT_STR not in sys.path:
     sys.path.insert(0, PROJECT_ROOT_STR)
 
-from src.models import NNAlign_MA
+from src.models import NNAlign_MA, NNAlign_MA_Extra_Features
 from src.datasets import NNAlign_MA_Dataset
-from src.datasets_utils import Collator_SA_Blosum_ClassII_Inference, load_blosum, load_pseudoseqs
+from src.datasets_utils import Collator_SA_Blosum_ClassII_Inference, Collator_SA_Blosum_ClassII_Extra_Features_Inference, load_blosum, load_pseudoseqs, load_blosum_freq_rownorm
 
 
 def args_parser():
@@ -28,6 +28,9 @@ def args_parser():
     parser.add_argument("-syn", "--synapse_file", type=str, help="Path to the file with model weights.")
     parser.add_argument("-a","--activation", choices=["relu","tanh", "sig"], default="tanh")
     parser.add_argument("-p", "--pred_file", type=str, help="Path to save the predictions.")
+    parser.add_argument("-ft", "--extra_features", action="store_true", help="Enable extra peptide-context features (PFR composition, peptide length and PFR length encodings).")
+    parser.add_argument("-blf", "--blosum_freq_file", type=str, help="Path to the blosum file freq rownorm.")
+    parser.add_argument("-pl", "--peptide_lengths", type=int, nargs=2, default=[12, 19], metavar=("MIN", "MAX"), help="Allowed peptide length range for length encoding.")
 
     return parser.parse_args()
 
@@ -61,15 +64,15 @@ def main():
     
     #Initialize inference dataset
     print("[INFO] Loading dataset...")
-    dataset = NNAlign_MA_Dataset(file_path=args.data_file)
+    dataset = NNAlign_MA_Dataset(file_path=args.data_file, min_length=args.peptide_lengths[0])
     print(f"[INFO] Dataset size: {len(dataset)} peptides")
 
     #Initialize collator for batch construction
-    collator = Collator_SA_Blosum_ClassII_Inference(
-        blosum_matrix=blosum_matrix,
-        aa_to_idx=aa_to_idx,
-        pseudoseqs_dict=pseudoseqs_dict
-    )
+    if args.extra_features:
+        blosum_matrix_freq, aa_to_idx_freq = load_blosum_freq_rownorm(blosum_file=args.blosum_freq_file)
+        collator = Collator_SA_Blosum_ClassII_Extra_Features_Inference(blosum_matrix=blosum_matrix, aa_to_idx=aa_to_idx, pseudoseqs_dict=pseudoseqs_dict, blosum_matrix_freq=blosum_matrix_freq, aa_to_idx_freq=aa_to_idx_freq, min_length=args.peptide_lengths[0], max_length=args.peptide_lengths[1])
+    else:
+        collator = Collator_SA_Blosum_ClassII_Inference(blosum_matrix=blosum_matrix, aa_to_idx=aa_to_idx, pseudoseqs_dict=pseudoseqs_dict)
 
     #Initialize dataloader
     loader = DataLoader(
@@ -97,10 +100,12 @@ def main():
     print("[INFO] Loading model checkpoint...")
     checkpoint = torch.load(args.synapse_file, map_location=device)
 
-    model = NNAlign_MA(
-        n_hidden=checkpoint["n_hidden"],
-        activation=activation
-    )
+    if args.extra_features:
+        model = NNAlign_MA_Extra_Features(n_hidden=checkpoint["n_hidden"],
+                                          activation=activation)
+    else:
+        model = NNAlign_MA(n_hidden=checkpoint["n_hidden"],
+                           activation = activation)
     
     model.load_state_dict(checkpoint["model_state_dict"])
     model.to(device)
@@ -126,7 +131,7 @@ def main():
 
                 z_max, idx_max = model.inference(X, pep_idx)
 
-                y = y.cpu().tolist()
+                y = y.tolist()
                 z_max = z_max.cpu().tolist()
                 idx_max = idx_max.cpu().tolist()
 
