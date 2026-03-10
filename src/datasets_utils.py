@@ -418,3 +418,67 @@ class Collator_SA_Blosum_ClassII_Extra_Features_Inference(Collator_SA_Blosum_Cla
             comb_list.append([core, allele])
 
         return comb_list
+    
+
+class Collator_SA_Blosum_ClassII_Encoded():
+
+
+    def __init__(self, pseudoseqs_dict):
+        self.pseudoseqs_dict = pseudoseqs_dict
+        self.use_hydrofobic_mask = None
+
+
+    def __call__(self, batch):
+
+        pep_idx_list = []
+        X_list = []
+        y_list = []
+
+        i = 0
+
+        for point in batch:
+
+            windows = point["windows"]
+            y = point["label"]
+            allele = point["allele"]
+            hydrophobic_p1_mask = point["hydrophobic_p1_mask"]
+
+            if self.use_hydrofobic_mask:
+                windows = windows[hydrophobic_p1_mask]
+            W = windows.size(0)
+
+            if W < 1:
+                continue
+
+            pseudoseq = self.pseudoseqs_dict[allele]
+
+            X = self._combine_window_pseudoseq(windows, pseudoseq, W, 1)
+            pep_idx = torch.full((W,), i, dtype=torch.long)
+
+            X_list.append(X)
+            y_list.append(y.unsqueeze(0))
+            pep_idx_list.append(pep_idx)
+
+            i += 1
+
+        if len(X_list) == 0:
+            return None
+
+        return self._finalize_batch(X_list, y_list, pep_idx_list)
+
+        
+    def _combine_window_pseudoseq(self, windows_embedding, pseudoseqs_tensor, W, P):
+        """Construct the Cartesian product between windows and pseudosequences."""
+        window_rep = windows_embedding.repeat_interleave(P, dim=0)
+        pseudoseqs_rep = pseudoseqs_tensor.repeat(W, 1)
+        X = torch.cat([window_rep, pseudoseqs_rep], dim=1)
+        return X
+    
+
+    def _finalize_batch(self, X_list, y_list, pep_idx_list):
+        """Concatenate all peptide-specific tensors into a batch."""
+        X = torch.cat(X_list, dim=0)
+        y = torch.cat(y_list, dim=0)
+        pep_idx = torch.cat(pep_idx_list, dim=0)
+
+        return X, y, pep_idx

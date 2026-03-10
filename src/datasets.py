@@ -1,4 +1,5 @@
 import random
+import torch
 from torch.utils.data import IterableDataset
 from torch.utils.data import Dataset
 
@@ -156,3 +157,124 @@ class NNAlign_MA_Dataset(Dataset):
     def __getitem__(self, idx):
         """Return sample at given index."""
         return self.dataset[idx]
+    
+
+class NNAlign_SA_Dataset_ClassII_Blosum_Encoded(Dataset):
+    """
+    PyTorch Dataset for NNAlign-style SA peptide–MHC data.
+
+    Each peptide generates all possible 9-mer cores, encoded with BLOSUM.
+    Returns per peptide:
+        - encoded candidate cores
+        - label
+        - allele
+        - mask indicating hydrophobic residue at P1 for each core
+    """
+
+    def __init__(self, file_path, min_length, blosum_matrix, aa_to_idx, pseudoseqs_dict):
+        """
+        Load dataset, count cores, allocate tensors, and encode peptide windows.
+        """
+
+        super(NNAlign_SA_Dataset_ClassII_Blosum_Encoded, self).__init__()
+
+        self.blosum_matrix = blosum_matrix
+        self.aa_to_idx = aa_to_idx
+        embedding_dim = self.blosum_matrix.shape[1]
+        core_length = 9
+        hydrophobic_aa = {"I", "L", "V", "M", "F", "Y"}
+
+        # First pass: count peptides and candidate cores
+        with open(file_path, "r") as infile:
+
+            total_cores = 0
+            total_peptides = 0
+            n_cores_list = []
+
+            for i, line in enumerate(infile, start=1):
+                fields = line.strip().split()
+                peptide, label, allele = fields[:3]
+
+                # Validate peptide length
+                assert len(peptide) >= min_length, \
+                    f"Peptide '{peptide}' (length {len(peptide)}) shorter than min_length {min_length}"
+
+                # Validate allele exists
+                assert allele in pseudoseqs_dict, (
+                    f"{file_path} line {i}: allele '{allele}' not found in pseudoseqs file"
+                )
+
+                n_cores = len(peptide) - 9 + 1
+                total_peptides += 1
+                total_cores += n_cores
+                n_cores_list.append(n_cores)
+
+        # Allocate tensors
+        self.windows = torch.empty((total_cores, embedding_dim * core_length), dtype=torch.float32)
+        self.offsets = torch.empty(total_peptides + 1, dtype=torch.long)
+        self.y = torch.empty(total_peptides, dtype=torch.float32)
+        self.hydrophobic_p1 = torch.empty(total_cores, dtype=torch.bool)
+        self.alleles = []
+
+        # Compute offsets mapping peptides → core slices
+        self.offsets[0] = 0
+        self.offsets[1:] = torch.cumsum(torch.tensor(n_cores_list, dtype=torch.long), dim=0)
+
+        # Second pass: encode windows and fill tensors
+        with open(file_path, "r") as infile:
+
+            pep_idx = 0
+            core_idx = 0
+
+            for line in infile:
+                peptide, label, allele = line.strip().split()[:3]
+
+                self.y[pep_idx] = float(label)
+
+                # Encode all 9-mer windows
+                windows_embedding = self._encode_windows(peptide, embedding_dim)
+                n_cores = windows_embedding.shape[0]
+
+                self.windows[core_idx:core_idx + n_cores] = windows_embedding
+                self.alleles.append(allele)
+
+                # Hydrophobic check at P1 (first residue of each window)
+                for i in range(len(peptide) - 9 + 1):
+                    self.hydrophobic_p1[core_idx + i] = peptide[i] in hydrophobic_aa
+
+                core_idx += n_cores
+                pep_idx += 1
+
+    def __len__(self):
+        """Number of peptides."""
+        return self.y.shape[0]
+
+    def __getitem__(self, idx):
+        """Return all candidate cores for one peptide."""
+
+        start = self.offsets[idx]
+        end = self.offsets[idx + 1]
+
+        return {
+            "windows": self.windows[start:end],
+            "label": self.y[idx],
+            "allele": self.alleles[idx],
+            "hydrophobic_p1_mask": self.hydrophobic_p1[start:end]
+        }
+
+    def _encode_windows(self, peptide, E):
+        """Encode all overlapping 9-mer windows using BLOSUM."""
+
+        # Convert peptide to BLOSUM indices
+        peptide_idxs = torch.tensor(
+            [self.aa_to_idx.get(aa, self.aa_to_idx["X"]) for aa in peptide],
+            dtype=torch.long
+        )
+
+        # Generate 9-mer windows
+        windows_idxs = peptide_idxs.unfold(0, 9, 1)
+        W = windows_idxs.size(0)
+
+        # Flatten BLOSUM embeddings
+        windows_embedding = self.blosum_matrix[windows_idxs].reshape(W, 9 * E)
+        return windows_embedding

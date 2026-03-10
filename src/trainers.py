@@ -11,7 +11,7 @@ class NNAlign_MA_trainer:
     """
 
 
-    def __init__(self, model, criterion, optimizer, device, loader_ma, loader_sa, loader_val, logger, SA_burn_in):
+    def __init__(self, model, criterion, optimizer, device, loader_ma, loader_sa, loader_val, logger, SA_burn_in, collator):
 
         self.model = model.to(device)  # move model to device
         self.criterion = criterion
@@ -26,6 +26,7 @@ class NNAlign_MA_trainer:
         self.Loss_val = []
         self.PCC_val = []
         self.logger = logger
+        self.collator = collator
 
 
     def _train_one_epoch(self, loader):
@@ -36,6 +37,9 @@ class NNAlign_MA_trainer:
         y_epoch = []
 
         for batch in loader:
+
+            if batch is None:
+                continue
             
             self.optimizer.zero_grad(set_to_none=True)
 
@@ -105,8 +109,10 @@ class NNAlign_MA_trainer:
 
             print(f"Epoch {epoch+1}")
 
+            self.collator.use_hydrofobic_mask = (epoch < 2)
             loader = self.loader_sa if epoch < self.SA_burn_in else self.loader_ma
             self._train_one_epoch(loader)
+            self.collator.use_hydrofobic_mask = False
             self._validate_one_epoch()
 
             if self.logger is not None:
