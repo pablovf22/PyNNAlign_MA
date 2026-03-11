@@ -102,16 +102,18 @@ def main():
     loader_sa = DataLoader(dataset_sa, 
                            batch_size=batch_size, 
                            shuffle=True,
-                           num_workers=0, 
+                           num_workers=4, 
                            collate_fn=collator, 
-                           pin_memory=pin_memory)
+                           pin_memory=pin_memory,
+                           persistent_workers=True)
     
     loader_val = DataLoader(dataset_val, 
                            batch_size=batch_size * 5, 
                            shuffle=False,
-                           num_workers=0, 
+                           num_workers=4, 
                            collate_fn=collator, 
-                           pin_memory=pin_memory)
+                           pin_memory=pin_memory,
+                           persistent_workers=True)
     
     #Activation funtion options
     ACTIVATION_FACTORY = {

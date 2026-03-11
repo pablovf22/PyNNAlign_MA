@@ -420,8 +420,13 @@ class Collator_SA_Blosum_ClassII_Extra_Features_Inference(Collator_SA_Blosum_Cla
         return comb_list
     
 
-class Collator_SA_Blosum_ClassII_Encoded():
+class Collator_SA_Blosum_ClassII_Encoded:
 
+    """
+    Collator that builds core-level batches by concatenating peptide windows
+    with their corresponding MHC pseudosequence. Handles variable numbers of
+    candidate cores per peptide and returns (X, y, pep_idx).
+    """
 
     def __init__(self, pseudoseqs_dict):
         self.pseudoseqs_dict = pseudoseqs_dict
@@ -430,55 +435,64 @@ class Collator_SA_Blosum_ClassII_Encoded():
 
     def __call__(self, batch):
 
-        pep_idx_list = []
-        X_list = []
-        y_list = []
-
-        i = 0
+        # First pass: count total windows and valid peptides
+        total_windows = 0
+        valid_points = []
 
         for point in batch:
 
             windows = point["windows"]
-            y = point["label"]
-            allele = point["allele"]
             hydrophobic_p1_mask = point["hydrophobic_p1_mask"]
 
             if self.use_hydrofobic_mask:
                 windows = windows[hydrophobic_p1_mask]
+
             W = windows.size(0)
 
             if W < 1:
                 continue
 
-            pseudoseq = self.pseudoseqs_dict[allele]
+            valid_points.append((point, windows))
+            total_windows += W
 
-            X = self._combine_window_pseudoseq(windows, pseudoseq, W, 1)
-            pep_idx = torch.full((W,), i, dtype=torch.long)
-
-            X_list.append(X)
-            y_list.append(y.unsqueeze(0))
-            pep_idx_list.append(pep_idx)
-
-            i += 1
-
-        if len(X_list) == 0:
+        if total_windows == 0:
             return None
 
-        return self._finalize_batch(X_list, y_list, pep_idx_list)
+        n_peptides = len(valid_points)
 
-        
-    def _combine_window_pseudoseq(self, windows_embedding, pseudoseqs_tensor, W, P):
-        """Construct the Cartesian product between windows and pseudosequences."""
-        window_rep = windows_embedding.repeat_interleave(P, dim=0)
-        pseudoseqs_rep = pseudoseqs_tensor.repeat(W, 1)
-        X = torch.cat([window_rep, pseudoseqs_rep], dim=1)
-        return X
-    
+        # Determine dimensions
+        window_dim = valid_points[0][1].size(1)
+        pseudoseq_dim = self.pseudoseqs_dict[valid_points[0][0]["allele"]].size(0)
+        input_dim = window_dim + pseudoseq_dim
 
-    def _finalize_batch(self, X_list, y_list, pep_idx_list):
-        """Concatenate all peptide-specific tensors into a batch."""
-        X = torch.cat(X_list, dim=0)
-        y = torch.cat(y_list, dim=0)
-        pep_idx = torch.cat(pep_idx_list, dim=0)
+        # Preallocate batch tensors
+        X = torch.empty((total_windows, input_dim), dtype=valid_points[0][1].dtype)
+        pep_idx = torch.empty((total_windows,), dtype=torch.long)
+        y = torch.empty((n_peptides,), dtype=torch.float32)
+
+        cursor = 0
+
+        # Second pass: fill tensors
+        for i, (point, windows) in enumerate(valid_points):
+
+            W = windows.size(0)
+
+            allele = point["allele"]
+            pseudoseq = self.pseudoseqs_dict[allele]
+            label = point["label"]
+
+            # Fill windows part
+            X[cursor:cursor+W, :window_dim] = windows
+
+            # Fill pseudosequence part (broadcast)
+            X[cursor:cursor+W, window_dim:] = pseudoseq
+
+            # Fill peptide indices
+            pep_idx[cursor:cursor+W] = i
+
+            # Fill label
+            y[i] = label
+
+            cursor += W
 
         return X, y, pep_idx
