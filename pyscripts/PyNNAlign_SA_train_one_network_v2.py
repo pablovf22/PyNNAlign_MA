@@ -96,7 +96,7 @@ def main():
     if args.extra_features:
         raise NotImplementedError
     else:
-        collator = Collator_SA_Blosum_ClassII_Encoded(pseudoseqs_dict=pseudoseqs_dict)
+        collator = Collator_SA_Blosum_ClassII_Encoded()
 
     #Initialize dataloaders
     loader_sa = DataLoader(dataset_sa, 

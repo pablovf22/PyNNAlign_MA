@@ -423,13 +423,17 @@ class Collator_SA_Blosum_ClassII_Extra_Features_Inference(Collator_SA_Blosum_Cla
 class Collator_SA_Blosum_ClassII_Encoded:
 
     """
-    Collator that builds core-level batches by concatenating peptide windows
-    with their corresponding MHC pseudosequence. Handles variable numbers of
-    candidate cores per peptide and returns (X, y, pep_idx).
+    PyTorch Dataset for NNAlign-style SA peptide–MHC data.
+
+    Each peptide generates all possible 9-mer cores, encoded with BLOSUM.
+    Returns per peptide:
+        - encoded candidate cores
+        - label
+        - encoded pseudosequence
+        - mask indicating hydrophobic residue at P1 for each core
     """
 
-    def __init__(self, pseudoseqs_dict):
-        self.pseudoseqs_dict = pseudoseqs_dict
+    def __init__(self):
         self.use_hydrofobic_mask = None
 
 
@@ -462,7 +466,7 @@ class Collator_SA_Blosum_ClassII_Encoded:
 
         # Determine dimensions
         window_dim = valid_points[0][1].size(1)
-        pseudoseq_dim = self.pseudoseqs_dict[valid_points[0][0]["allele"]].size(0)
+        pseudoseq_dim = valid_points[0][0]["pseudoseq"].size(0)
         input_dim = window_dim + pseudoseq_dim
 
         # Preallocate batch tensors
@@ -477,8 +481,7 @@ class Collator_SA_Blosum_ClassII_Encoded:
 
             W = windows.size(0)
 
-            allele = point["allele"]
-            pseudoseq = self.pseudoseqs_dict[allele]
+            pseudoseq = point["pseudoseq"]
             label = point["label"]
 
             # Fill windows part

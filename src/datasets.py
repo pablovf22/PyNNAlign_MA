@@ -214,7 +214,7 @@ class NNAlign_SA_Dataset_ClassII_Blosum_Encoded(Dataset):
         self.offsets = torch.empty(total_peptides + 1, dtype=torch.long)
         self.y = torch.empty(total_peptides, dtype=torch.float32)
         self.hydrophobic_p1 = torch.empty(total_cores, dtype=torch.bool)
-        self.alleles = []
+        self.pseudo = torch.empty((total_peptides, embedding_dim * 34), dtype=torch.float32)
 
         # Compute offsets mapping peptides → core slices
         self.offsets[0] = 0
@@ -236,7 +236,7 @@ class NNAlign_SA_Dataset_ClassII_Blosum_Encoded(Dataset):
                 n_cores = windows_embedding.shape[0]
 
                 self.windows[core_idx:core_idx + n_cores] = windows_embedding
-                self.alleles.append(allele)
+                self.pseudo[pep_idx] = pseudoseqs_dict[allele]
 
                 # Hydrophobic check at P1 (first residue of each window)
                 for i in range(len(peptide) - 9 + 1):
@@ -258,7 +258,7 @@ class NNAlign_SA_Dataset_ClassII_Blosum_Encoded(Dataset):
         return {
             "windows": self.windows[start:end],
             "label": self.y[idx],
-            "allele": self.alleles[idx],
+            "pseudoseq": self.pseudo[idx],
             "hydrophobic_p1_mask": self.hydrophobic_p1[start:end]
         }
 
