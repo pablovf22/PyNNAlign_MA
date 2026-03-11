@@ -90,7 +90,7 @@ def main():
     dataset_sa = NNAlign_SA_Dataset_ClassII_Blosum_Encoded(file_path=data_file, min_length=args.peptide_lengths[0], blosum_matrix=blosum_matrix, aa_to_idx=aa_to_idx, pseudoseqs_dict=pseudoseqs_dict)              #MA dataset works for this SA setup, we only have to use a different collator_fn
 
     #Initialize validation dataset
-    dataset_val = NNAlign_SA_Dataset_ClassII_Blosum_Encoded(file_path=data_file, min_length=args.peptide_lengths[0], blosum_matrix=blosum_matrix, aa_to_idx=aa_to_idx, pseudoseqs_dict=pseudoseqs_dict)
+    dataset_val = NNAlign_SA_Dataset_ClassII_Blosum_Encoded(file_path=val_file, min_length=args.peptide_lengths[0], blosum_matrix=blosum_matrix, aa_to_idx=aa_to_idx, pseudoseqs_dict=pseudoseqs_dict)
 
     #Initialize collator for batch construction
     if args.extra_features:
