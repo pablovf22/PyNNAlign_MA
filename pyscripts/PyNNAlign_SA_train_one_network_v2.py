@@ -38,7 +38,7 @@ def args_parser():
     parser.add_argument("-tc", "--training_curves", type=str, help="Path to save the training curves figure.")
     parser.add_argument("-wb", "--wandb_name", type=str, help="Name of this run to be logged in W&B.")
     parser.add_argument("-w", "--wandb_dir", type=str, help="The name of the directory to save wandb generated files.")
-    parser.add_argument("-a","--activation", choices=["relu","tanh", "sig"], default="tanh")
+    parser.add_argument("-a","--activation", choices=["relu","tanh", "sig"], default="sig")
     parser.add_argument("-c","--criterion",  choices=["bce","mse"],   default="mse")
     parser.add_argument("-o","--optimizer",  choices=["adam","adamw","sgd"], default="sgd")
     parser.add_argument("-ft", "--extra_features", action="store_true", help="Enable extra peptide-context features (PFR composition, peptide length and PFR length encodings).")
