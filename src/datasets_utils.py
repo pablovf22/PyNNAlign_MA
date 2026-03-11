@@ -420,7 +420,7 @@ class Collator_SA_Blosum_ClassII_Extra_Features_Inference(Collator_SA_Blosum_Cla
         return comb_list
     
 
-class Collator_SA_Blosum_ClassII_Encoded:
+class Collator_SA_Blosum_ClassII_Encoded():
 
     """
     PyTorch Dataset for NNAlign-style SA peptide–MHC data.
@@ -433,8 +433,9 @@ class Collator_SA_Blosum_ClassII_Encoded:
         - mask indicating hydrophobic residue at P1 for each core
     """
 
-    def __init__(self):
+    def __init__(self, pseudoseqs_dict):
         self.use_hydrofobic_mask = None
+        self.pseudoseqs_dict = pseudoseqs_dict
 
 
     def __call__(self, batch):
@@ -466,7 +467,7 @@ class Collator_SA_Blosum_ClassII_Encoded:
 
         # Determine dimensions
         window_dim = valid_points[0][1].size(1)
-        pseudoseq_dim = valid_points[0][0]["pseudoseq"].size(0)
+        pseudoseq_dim = self.pseudoseqs_dict[valid_points[0][0]["allele"]].size(0)
         input_dim = window_dim + pseudoseq_dim
 
         # Preallocate batch tensors
@@ -481,7 +482,7 @@ class Collator_SA_Blosum_ClassII_Encoded:
 
             W = windows.size(0)
 
-            pseudoseq = point["pseudoseq"]
+            pseudoseq = self.pseudoseqs_dict[point["allele"]]
             label = point["label"]
 
             # Fill windows part

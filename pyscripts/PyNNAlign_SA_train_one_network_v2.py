@@ -18,7 +18,6 @@ from src.models import NNAlign_MA, NNAlign_MA_Extra_Features
 from src.datasets import NNAlign_SA_Dataset_ClassII_Blosum_Encoded, NNAlign_SA_Dataset_ClassII_Blosum_Encoded_Extra_Features
 from src.datasets_utils import Collator_SA_Blosum_ClassII_Encoded, load_blosum, load_pseudoseqs, load_blosum_freq_rownorm
 from src.trainers import NNAlign_MA_trainer
-from src.utils import plot_training_curves
 
 
 def args_parser():
@@ -98,7 +97,7 @@ def main():
         
 
     #Initialize collator for batch construction
-    collator = Collator_SA_Blosum_ClassII_Encoded()
+    collator = Collator_SA_Blosum_ClassII_Encoded(pseudoseqs_dict=pseudoseqs_dict)
 
     #Initialize dataloaders
     loader_sa = DataLoader(dataset_sa, 
@@ -179,9 +178,6 @@ def main():
     print(f"[DONE] Saving weights to {syn_path}")
 
     trainer.save(syn_path=syn_path)
-
-    #Plot and save training curves
-    plot_training_curves(trainer=trainer, save_path=args.training_curves)
 
     wandb.finish()
 

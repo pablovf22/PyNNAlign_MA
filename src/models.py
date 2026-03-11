@@ -77,7 +77,7 @@ class NNAlign_MA_Extra_Features(nn.Module):
     """
 
 
-    def __init__(self, activation, n_hidden=56, aa_embedding_dim=24, window_size=9, pseudoseq_size=34, pfr_embedding_dim=20, peptide_length_encoding_dim=8, pfr_length_encoding_dim=4):
+    def __init__(self, activation, n_hidden=56, aa_embedding_dim=24, window_size=9, pseudoseq_size=34, pfr_embedding_dim=20, pfr_length_encoding_dim=4):
 
         super().__init__()
         self.aa_embedding_dim = aa_embedding_dim
@@ -85,6 +85,7 @@ class NNAlign_MA_Extra_Features(nn.Module):
         self.pseudoseq_size = pseudoseq_size
         self.n_hidden = n_hidden
         self.pfr_embedding_dim = pfr_embedding_dim
+        peptide_length_encoding_dim = 8
         self.in_dim = ((self.window_size + self.pseudoseq_size) * self.aa_embedding_dim) + (self.pfr_embedding_dim * 2) + peptide_length_encoding_dim + pfr_length_encoding_dim 
         self.in_layer = nn.Linear(self.in_dim, n_hidden)
         self.out_layer = nn.Linear(n_hidden, 1)

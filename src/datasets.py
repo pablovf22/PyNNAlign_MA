@@ -214,7 +214,7 @@ class NNAlign_SA_Dataset_ClassII_Blosum_Encoded(Dataset):
         self.offsets = torch.empty(total_peptides + 1, dtype=torch.long)
         self.y = torch.empty(total_peptides, dtype=torch.float32)
         self.hydrophobic_p1 = torch.empty(total_cores, dtype=torch.bool)
-        self.pseudo = torch.empty((total_peptides, embedding_dim * 34), dtype=torch.float32)
+        self.alleles = []
 
         # Compute offsets mapping peptides → core slices
         self.offsets[0] = 0
@@ -236,7 +236,7 @@ class NNAlign_SA_Dataset_ClassII_Blosum_Encoded(Dataset):
                 n_cores = windows_embedding.shape[0]
 
                 self.windows[core_idx:core_idx + n_cores] = windows_embedding
-                self.pseudo[pep_idx] = pseudoseqs_dict[allele]
+                self.alleles.append(allele)
 
                 # Hydrophobic check at P1 (first residue of each window)
                 for i in range(len(peptide) - 9 + 1):
@@ -258,7 +258,7 @@ class NNAlign_SA_Dataset_ClassII_Blosum_Encoded(Dataset):
         return {
             "windows": self.windows[start:end],
             "label": self.y[idx],
-            "pseudoseq": self.pseudo[idx],
+            "allele": self.alleles[idx],
             "hydrophobic_p1_mask": self.hydrophobic_p1[start:end]
         }
 
@@ -343,7 +343,7 @@ class NNAlign_SA_Dataset_ClassII_Blosum_Encoded_Extra_Features(Dataset):
         self.offsets = torch.empty(total_peptides + 1, dtype=torch.long)
         self.y = torch.empty(total_peptides, dtype=torch.float32)
         self.hydrophobic_p1 = torch.empty(total_cores, dtype=torch.bool)
-        self.pseudo = torch.empty((total_peptides, embedding_dim * 34), dtype=torch.float32)
+        self.alleles = []
 
         # Compute offsets mapping peptides → core slices
         self.offsets[0] = 0
@@ -375,7 +375,7 @@ class NNAlign_SA_Dataset_ClassII_Blosum_Encoded_Extra_Features(Dataset):
                 self.windows[core_idx:core_idx + n_cores, core_end:pfr_end] = pfrs_embedding
                 self.windows[core_idx:core_idx + n_cores, pfr_end:pfr_len_end] = pfrs_length_encoding
                 self.windows[core_idx:core_idx + n_cores, pfr_len_end:] = peptide_length_encoding
-                self.pseudo[pep_idx] = pseudoseqs_dict[allele]
+                self.alleles.append(allele)
 
                 # Hydrophobic check at P1 (first residue of each window)
                 for i in range(len(peptide) - 9 + 1):
@@ -397,7 +397,7 @@ class NNAlign_SA_Dataset_ClassII_Blosum_Encoded_Extra_Features(Dataset):
         return {
             "windows": self.windows[start:end],
             "label": self.y[idx],
-            "pseudoseq": self.pseudo[idx],
+            "allele": self.alleles[idx],
             "hydrophobic_p1_mask": self.hydrophobic_p1[start:end]
         }
 
