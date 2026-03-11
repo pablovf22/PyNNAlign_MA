@@ -182,7 +182,7 @@ class NNAlign_SA_Dataset_ClassII_Blosum_Encoded(Dataset):
         self.aa_to_idx = aa_to_idx
         embedding_dim = self.blosum_matrix.shape[1]
         core_length = 9
-        hydrophobic_aa = {"I", "L", "V", "M", "F", "Y"}
+        hydrophobic_aa = {"I", "L", "V", "M", "F", "Y", "W"}
 
         # First pass: count peptides and candidate cores
         with open(file_path, "r") as infile:
@@ -308,7 +308,7 @@ class NNAlign_SA_Dataset_ClassII_Blosum_Encoded_Extra_Features(Dataset):
         peptide_length_encoding_dim = max_length - min_length + 1
         pfrs_length_encoding_dim = 2
         core_length = 9
-        hydrophobic_aa = {"I", "L", "V", "M", "F", "Y"}
+        hydrophobic_aa = {"I", "L", "V", "M", "F", "Y", "W"}
         self.pfr_length = pfr_length
         self.min_length = min_length
         self.max_length = max_length
