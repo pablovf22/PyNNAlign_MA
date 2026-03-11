@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=PyNNAlign_SA_HLA-DR_05_110326
+#SBATCH --job-name=PyNNAlign_SA_Extra_Features_HLA-DR_01_110326
 #SBATCH --output=/home/projects2/s243357/master_thesis/PyNNAlign_MA/outputs/logs/slurm-%x.out
 #SBATCH --error=/home/projects2/s243357/master_thesis/PyNNAlign_MA/outputs/logs/slurm-%x.err
 #SBATCH --nodes=1
@@ -9,7 +9,7 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --time=24:00:00
 
-RUN_ID="PyNNAlign_SA_HLA-DR_05_110326"
+RUN_ID="PyNNAlign_SA_Extra_Features_HLA-DR_01_110326"
 
 ENV="PyNNAlign_MA"
 
@@ -28,7 +28,7 @@ WB_DIR="$PROJECT_ROOT/outputs/wandb/$RUN_ID"
 BATCH_SIZE=256
 BURN_IN_SA=200
 N_HIDDEN=56
-LEARNING_RATE=0.0005
+LEARNING_RATE=0.05
 EPOCHS=200
 ACTIVATION="sig"
 CRITERION="mse"
@@ -41,4 +41,4 @@ source $(conda info --base)/etc/profile.d/conda.sh
 conda activate "$ENV"
 
 
-python pyscripts/PyNNAlign_SA_train_one_network.py -b "$BATCH_SIZE" -sa "$BURN_IN_SA" -tr "$TRAIN_EL" -bl "$BLF" -ps "$PSEUDO" -syn "$SYN" -nh "$N_HIDDEN" -lr "$LEARNING_RATE" -e "$EPOCHS" -val "$VAL_EL" -wb "$RUN_ID" -w "$WB_DIR" -a "$ACTIVATION" -c "$CRITERION" -o "$OPTIMIZER" -blf "$BLF_PFR" > "$PROJECT_ROOT/outputs/logs/$RUN_ID.log" 2>&1
+python pyscripts/PyNNAlign_SA_train_one_network.py -b "$BATCH_SIZE" -sa "$BURN_IN_SA" -tr "$TRAIN_EL" -bl "$BLF" -ps "$PSEUDO" -syn "$SYN" -nh "$N_HIDDEN" -lr "$LEARNING_RATE" -e "$EPOCHS" -val "$VAL_EL" -wb "$RUN_ID" -w "$WB_DIR" -a "$ACTIVATION" -c "$CRITERION" -o "$OPTIMIZER" -ft -blf "$BLF_PFR" > "$PROJECT_ROOT/outputs/logs/$RUN_ID.log" 2>&1
