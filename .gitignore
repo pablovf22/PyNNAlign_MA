@@ -10,3 +10,6 @@ outputs/
 
 #models weights
 models/
+
+#scripts 
+scripts/
