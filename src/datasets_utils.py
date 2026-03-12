@@ -159,7 +159,7 @@ class Collator_MA_Blosum:
 
     def _make_targets_idx(self, label, pep_i, W, P):
         """Create peptide-level target and grouping indices."""
-        y = torch.tensor([float(label)], dtype=torch.float32)
+        y = torch.tensor([label], dtype=torch.float32)
         pep_idx = torch.full((W * P,), pep_i, dtype=torch.long)
         return y, pep_idx
 

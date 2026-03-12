@@ -14,7 +14,7 @@ if PROJECT_ROOT_STR not in sys.path:
     sys.path.insert(0, PROJECT_ROOT_STR)
 
 from src.models import NNAlign_MA, NNAlign_MA_Extra_Features
-from src.datasets import NNAlign_MA_Dataset
+from src.datasets import NNAlign_OnlineDataset
 from src.datasets_utils import Collator_SA_Blosum_ClassII_Inference, Collator_SA_Blosum_ClassII_Extra_Features_Inference, load_blosum, load_pseudoseqs, load_blosum_freq_rownorm
 
 
@@ -64,7 +64,7 @@ def main():
     
     #Initialize inference dataset
     print("[INFO] Loading dataset...")
-    dataset = NNAlign_MA_Dataset(file_path=args.data_file, min_length=args.peptide_lengths[0])
+    dataset = NNAlign_OnlineDataset(file_path=args.data_file, min_length=args.peptide_lengths[0])
     print(f"[INFO] Dataset size: {len(dataset)} peptides")
 
     #Initialize collator for batch construction

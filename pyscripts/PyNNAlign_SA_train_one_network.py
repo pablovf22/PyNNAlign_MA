@@ -15,7 +15,7 @@ if PROJECT_ROOT_STR not in sys.path:
     sys.path.insert(0, PROJECT_ROOT_STR)
 
 from src.models import NNAlign_MA, NNAlign_MA_Extra_Features
-from src.datasets import NNAlign_SA_Dataset_ClassII_Blosum_Encoded, NNAlign_SA_Dataset_ClassII_Blosum_Encoded_Extra_Features
+from src.datasets import NNAlign_SA_BlosumEncodedDataset, NNAlign_SA_BlosumEncodedExtraFeaturesDataset
 from src.datasets_utils import Collator_SA_Blosum_ClassII_Encoded, load_blosum, load_pseudoseqs, load_blosum_freq_rownorm
 from src.trainers import NNAlign_MA_trainer
 
@@ -87,11 +87,11 @@ def main():
     print(f"[3/4] Loading full dataset into RAM from {data_file}...")
     if args.extra_features:
         blosum_matrix_freq, aa_to_idx_freq = load_blosum_freq_rownorm(args.blosum_freq_file)
-        dataset_sa = NNAlign_SA_Dataset_ClassII_Blosum_Encoded_Extra_Features(file_path=data_file, min_length=args.peptide_lengths[0], blosum_matrix=blosum_matrix, aa_to_idx=aa_to_idx, pseudoseqs_dict=pseudoseqs_dict, blosum_matrix_freq=blosum_matrix_freq, aa_to_idx_freq=aa_to_idx_freq)
-        dataset_val = NNAlign_SA_Dataset_ClassII_Blosum_Encoded_Extra_Features(file_path=val_file, min_length=args.peptide_lengths[0], blosum_matrix=blosum_matrix, aa_to_idx=aa_to_idx, pseudoseqs_dict=pseudoseqs_dict, blosum_matrix_freq=blosum_matrix_freq, aa_to_idx_freq=aa_to_idx_freq)
+        dataset_sa = NNAlign_SA_BlosumEncodedExtraFeaturesDataset(file_path=data_file, min_length=args.peptide_lengths[0], blosum_matrix=blosum_matrix, aa_to_idx=aa_to_idx, pseudoseqs_dict=pseudoseqs_dict, blosum_matrix_freq=blosum_matrix_freq, aa_to_idx_freq=aa_to_idx_freq)
+        dataset_val = NNAlign_SA_BlosumEncodedExtraFeaturesDataset(file_path=val_file, min_length=args.peptide_lengths[0], blosum_matrix=blosum_matrix, aa_to_idx=aa_to_idx, pseudoseqs_dict=pseudoseqs_dict, blosum_matrix_freq=blosum_matrix_freq, aa_to_idx_freq=aa_to_idx_freq)
     else: 
-        dataset_sa = NNAlign_SA_Dataset_ClassII_Blosum_Encoded(file_path=data_file, min_length=args.peptide_lengths[0], blosum_matrix=blosum_matrix, aa_to_idx=aa_to_idx, pseudoseqs_dict=pseudoseqs_dict)              #MA dataset works for this SA setup, we only have to use a different collator_fn
-        dataset_val = NNAlign_SA_Dataset_ClassII_Blosum_Encoded(file_path=val_file, min_length=args.peptide_lengths[0], blosum_matrix=blosum_matrix, aa_to_idx=aa_to_idx, pseudoseqs_dict=pseudoseqs_dict)
+        dataset_sa = NNAlign_SA_BlosumEncodedDataset(file_path=data_file, min_length=args.peptide_lengths[0], blosum_matrix=blosum_matrix, aa_to_idx=aa_to_idx, pseudoseqs_dict=pseudoseqs_dict)              #MA dataset works for this SA setup, we only have to use a different collator_fn
+        dataset_val = NNAlign_SA_BlosumEncodedDataset(file_path=val_file, min_length=args.peptide_lengths[0], blosum_matrix=blosum_matrix, aa_to_idx=aa_to_idx, pseudoseqs_dict=pseudoseqs_dict)
     
    
         

@@ -2,22 +2,21 @@ import torch
 from torch.utils.data import Dataset
 
 
-class NNAlign_MA_Dataset(Dataset):
+class NNAlign_OnlineDataset(Dataset):
     """
-    In-memory dataset for NNAlign MA training.
+    In-memory dataset used for NNAlign testing and inference.
 
-    Loads the entire text file into memory as (peptide, label, cell_line)
-    tuples.
+    Loads samples as (peptide, label, allele/cell_line) tuples.
+    All window generation and feature encoding are handled later by the collator.
     """
 
     def __init__(self, file_path, min_length):
 
-        super(NNAlign_MA_Dataset, self).__init__()
+        super(NNAlign_OnlineDataset, self).__init__()
 
-        self.dataset = []  # Stores all samples in memory
-        self.min_length = min_length
+        self.dataset = []  #Stores all samples in memory
 
-        # Load and optionally filter samples
+        #Load and filter samples
         with open(file_path, "r") as infile:
 
             for line in infile:
@@ -25,11 +24,11 @@ class NNAlign_MA_Dataset(Dataset):
                 # Parse first three whitespace-separated fields
                 peptide, label, cell_line = line.strip().split()[:3]
 
-                assert len(peptide) >= self.min_length, \
-                    f"Peptide '{peptide}' has length {len(peptide)}, which is shorter than the minimum allowed ({self.min_length})."
+                assert len(peptide) >= min_length, \
+                    f"Peptide '{peptide}' has length {len(peptide)}, which is shorter than the minimum allowed ({min_length})."
 
-                # Store sample as (peptide, int label, cell_line)
-                self.dataset.append((peptide, int(float(label)), cell_line))
+                # Store sample as (peptide, label, cell_line/allele)
+                self.dataset.append((peptide, float(label), cell_line))
 
     def __len__(self):
         """Return number of loaded samples."""
@@ -40,11 +39,15 @@ class NNAlign_MA_Dataset(Dataset):
         return self.dataset[idx]
     
 
-class NNAlign_SA_Dataset_ClassII_Blosum_Encoded(Dataset):
+class NNAlign_SA_BlosumEncodedDataset(Dataset):
     """
-    PyTorch Dataset for NNAlign-style SA peptide–MHC data.
+    PyTorch Dataset for NNAlign-style single-allele (SA) peptide–MHC training.
 
-    Each peptide generates all possible 9-mer cores, encoded with BLOSUM.
+    This dataset precomputes and stores all candidate 9-mer peptide cores using
+    BLOSUM encoding, allowing fast training by avoiding on-the-fly feature
+    generation. Each peptide is expanded into all possible candidate cores during
+    initialization.
+
     Returns per peptide:
         - encoded candidate cores
         - label
@@ -54,14 +57,14 @@ class NNAlign_SA_Dataset_ClassII_Blosum_Encoded(Dataset):
 
     def __init__(self, file_path, min_length, blosum_matrix, aa_to_idx, pseudoseqs_dict):
         """
-        Load dataset, count cores, allocate tensors, and encode peptide windows.
+        Load dataset, count cores, allocate tensors and encode peptide windows.
         """
 
-        super(NNAlign_SA_Dataset_ClassII_Blosum_Encoded, self).__init__()
+        super(NNAlign_SA_BlosumEncodedDataset, self).__init__()
 
         self.blosum_matrix = blosum_matrix
         self.aa_to_idx = aa_to_idx
-        embedding_dim = self.blosum_matrix.shape[1]
+        aa_embedding_dim = self.blosum_matrix.shape[1]
         core_length = 9
         hydrophobic_aa = {"I", "L", "V", "M", "F", "Y", "W"}
 
@@ -82,7 +85,7 @@ class NNAlign_SA_Dataset_ClassII_Blosum_Encoded(Dataset):
 
                 # Validate allele exists
                 assert allele in pseudoseqs_dict, (
-                    f"{file_path} line {i}: allele '{allele}' not found in pseudoseqs file"
+                    f"{file_path} line {i}: allele '{allele}' not found in pseudosequence file"
                 )
 
                 n_cores = len(peptide) - 9 + 1
@@ -91,10 +94,10 @@ class NNAlign_SA_Dataset_ClassII_Blosum_Encoded(Dataset):
                 n_cores_list.append(n_cores)
 
         # Allocate tensors
-        self.windows = torch.empty((total_cores, embedding_dim * core_length), dtype=torch.float32)
+        self.windows = torch.empty((total_cores, aa_embedding_dim * core_length), dtype=torch.float32)
         self.offsets = torch.empty(total_peptides + 1, dtype=torch.long)
         self.y = torch.empty(total_peptides, dtype=torch.float32)
-        self.hydrophobic_p1 = torch.empty(total_cores, dtype=torch.bool)
+        self.hydrophobic_p1_mask = torch.empty(total_cores, dtype=torch.bool)
         self.alleles = []
 
         # Compute offsets mapping peptides → core slices
@@ -113,15 +116,14 @@ class NNAlign_SA_Dataset_ClassII_Blosum_Encoded(Dataset):
                 self.y[pep_idx] = float(label)
 
                 # Encode all 9-mer windows
-                windows_embedding = self._encode_windows(peptide, embedding_dim)
-                n_cores = windows_embedding.shape[0]
+                windows_embedding, n_cores = self._encode_windows(peptide, aa_embedding_dim)
 
                 self.windows[core_idx:core_idx + n_cores] = windows_embedding
                 self.alleles.append(allele)
 
                 # Hydrophobic check at P1 (first residue of each window)
                 for i in range(len(peptide) - 9 + 1):
-                    self.hydrophobic_p1[core_idx + i] = peptide[i] in hydrophobic_aa
+                    self.hydrophobic_p1_mask[core_idx + i] = peptide[i] in hydrophobic_aa
 
                 core_idx += n_cores
                 pep_idx += 1
@@ -140,7 +142,7 @@ class NNAlign_SA_Dataset_ClassII_Blosum_Encoded(Dataset):
             "windows": self.windows[start:end],
             "label": self.y[idx],
             "allele": self.alleles[idx],
-            "hydrophobic_p1_mask": self.hydrophobic_p1[start:end]
+            "hydrophobic_p1_mask": self.hydrophobic_p1_mask[start:end]
         }
 
     def _encode_windows(self, peptide, E):
@@ -158,18 +160,22 @@ class NNAlign_SA_Dataset_ClassII_Blosum_Encoded(Dataset):
 
         # Flatten BLOSUM embeddings
         windows_embedding = self.blosum_matrix[windows_idxs].reshape(W, 9 * E)
-        return windows_embedding
+        return windows_embedding, W
     
 
-class NNAlign_SA_Dataset_ClassII_Blosum_Encoded_Extra_Features(Dataset):
+class NNAlign_SA_BlosumEncodedExtraFeaturesDataset(Dataset):
     """
-    PyTorch Dataset for NNAlign-style SA peptide–MHC data.
+    PyTorch Dataset for NNAlign-style single-allele (SA) peptide–MHC training.
 
-    Each peptide generates all possible 9-mer cores, encoded with BLOSUM.
+    All peptide cores and additional peptide-context features are precomputed
+    during dataset initialization to speed up training. Each peptide generates
+    all possible 9-mer cores encoded with BLOSUM and includes extra features
+    (e.g., PFR composition, peptide length, and PFR length).
+
     Returns per peptide:
-        - encoded candidate cores
+        - encoded candidate cores with extra features
         - label
-        - encoded pseudosequence
+        - allele
         - mask indicating hydrophobic residue at P1 for each core
     """
 
@@ -178,14 +184,14 @@ class NNAlign_SA_Dataset_ClassII_Blosum_Encoded_Extra_Features(Dataset):
         Load dataset, count cores, allocate tensors, and encode peptide windows.
         """
 
-        super(NNAlign_SA_Dataset_ClassII_Blosum_Encoded_Extra_Features, self).__init__()
+        super(NNAlign_SA_BlosumEncodedExtraFeaturesDataset, self).__init__()
 
         self.blosum_matrix = blosum_matrix
         self.aa_to_idx = aa_to_idx
         self.blosum_matrix_freq = blosum_matrix_freq
         self.aa_to_idx_freq = aa_to_idx_freq
-        embedding_dim = self.blosum_matrix.shape[1]
-        pfrs_encoding_dim = self.blosum_matrix_freq.shape[1]
+        aa_embedding_dim = self.blosum_matrix.shape[1]
+        pfrs_aa_embedding_dim = self.blosum_matrix_freq.shape[1]
         peptide_length_encoding_dim = max_length - min_length + 1
         pfrs_length_encoding_dim = 2
         core_length = 9
@@ -220,10 +226,10 @@ class NNAlign_SA_Dataset_ClassII_Blosum_Encoded_Extra_Features(Dataset):
                 n_cores_list.append(n_cores)
 
         # Allocate tensors
-        self.windows = torch.empty((total_cores, (embedding_dim * core_length) + peptide_length_encoding_dim + 2 * pfrs_encoding_dim + 2 * pfrs_length_encoding_dim), dtype=torch.float32)
+        self.windows = torch.empty((total_cores, (aa_embedding_dim * core_length) + peptide_length_encoding_dim + 2 * pfrs_aa_embedding_dim + 2 * pfrs_length_encoding_dim), dtype=torch.float32)
         self.offsets = torch.empty(total_peptides + 1, dtype=torch.long)
         self.y = torch.empty(total_peptides, dtype=torch.float32)
-        self.hydrophobic_p1 = torch.empty(total_cores, dtype=torch.bool)
+        self.hydrophobic_p1_mask = torch.empty(total_cores, dtype=torch.bool)
         self.alleles = []
 
         # Compute offsets mapping peptides → core slices
@@ -242,14 +248,13 @@ class NNAlign_SA_Dataset_ClassII_Blosum_Encoded_Extra_Features(Dataset):
                 self.y[pep_idx] = float(label)
 
                 # Encode all 9-mer windows
-                windows_embedding = self._encode_windows(peptide, embedding_dim)
-                n_cores = windows_embedding.shape[0]
+                windows_embedding, n_cores = self._encode_windows(peptide, aa_embedding_dim)
                 pfrs_embedding = self._encode_pfrs(peptide, n_cores)
                 pfrs_length_encoding = self._encode_pfrs_length(peptide, n_cores)
                 peptide_length_encoding = self._encode_peptide_length(peptide, n_cores)
 
-                core_end = embedding_dim * core_length
-                pfr_end = core_end + 2 * pfrs_encoding_dim
+                core_end = aa_embedding_dim * core_length
+                pfr_end = core_end + 2 * pfrs_aa_embedding_dim
                 pfr_len_end = pfr_end + 2 * pfrs_length_encoding_dim
 
                 self.windows[core_idx:core_idx + n_cores, :core_end] = windows_embedding
@@ -260,7 +265,7 @@ class NNAlign_SA_Dataset_ClassII_Blosum_Encoded_Extra_Features(Dataset):
 
                 # Hydrophobic check at P1 (first residue of each window)
                 for i in range(len(peptide) - 9 + 1):
-                    self.hydrophobic_p1[core_idx + i] = peptide[i] in hydrophobic_aa
+                    self.hydrophobic_p1_mask[core_idx + i] = peptide[i] in hydrophobic_aa
 
                 core_idx += n_cores
                 pep_idx += 1
@@ -279,7 +284,7 @@ class NNAlign_SA_Dataset_ClassII_Blosum_Encoded_Extra_Features(Dataset):
             "windows": self.windows[start:end],
             "label": self.y[idx],
             "allele": self.alleles[idx],
-            "hydrophobic_p1_mask": self.hydrophobic_p1[start:end]
+            "hydrophobic_p1_mask": self.hydrophobic_p1_mask[start:end]
         }
 
     def _encode_windows(self, peptide, E):
@@ -297,7 +302,7 @@ class NNAlign_SA_Dataset_ClassII_Blosum_Encoded_Extra_Features(Dataset):
 
         # Flatten BLOSUM embeddings
         windows_embedding = self.blosum_matrix[windows_idxs].reshape(W, 9 * E)
-        return windows_embedding
+        return windows_embedding, W
     
     def _encode_pfrs(self, peptide, W):
         """Encode left and right peptide flanking regions using averaged row-normalized BLOSUM vectors."""
