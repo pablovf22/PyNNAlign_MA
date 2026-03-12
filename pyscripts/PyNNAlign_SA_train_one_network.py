@@ -15,10 +15,9 @@ if PROJECT_ROOT_STR not in sys.path:
     sys.path.insert(0, PROJECT_ROOT_STR)
 
 from src.models import NNAlign_MA, NNAlign_MA_Extra_Features
-from src.datasets import NNAlign_MA_Dataset
-from src.datasets_utils import Collator_SA_Blosum_ClassII, Collator_SA_Blosum_ClassII_Extra_Features, load_blosum, load_pseudoseqs, load_blosum_freq_rownorm
+from src.datasets import NNAlign_SA_Dataset_ClassII_Blosum_Encoded, NNAlign_SA_Dataset_ClassII_Blosum_Encoded_Extra_Features
+from src.datasets_utils import Collator_SA_Blosum_ClassII_Encoded, load_blosum, load_pseudoseqs, load_blosum_freq_rownorm
 from src.trainers import NNAlign_MA_trainer
-from src.utils import plot_training_curves
 
 
 def args_parser():
@@ -38,7 +37,7 @@ def args_parser():
     parser.add_argument("-tc", "--training_curves", type=str, help="Path to save the training curves figure.")
     parser.add_argument("-wb", "--wandb_name", type=str, help="Name of this run to be logged in W&B.")
     parser.add_argument("-w", "--wandb_dir", type=str, help="The name of the directory to save wandb generated files.")
-    parser.add_argument("-a","--activation", choices=["relu","tanh", "sig"], default="tanh")
+    parser.add_argument("-a","--activation", choices=["relu","tanh", "sig"], default="sig")
     parser.add_argument("-c","--criterion",  choices=["bce","mse"],   default="mse")
     parser.add_argument("-o","--optimizer",  choices=["adam","adamw","sgd"], default="sgd")
     parser.add_argument("-ft", "--extra_features", action="store_true", help="Enable extra peptide-context features (PFR composition, peptide length and PFR length encodings).")
@@ -84,20 +83,21 @@ def main():
                                       blosum_matrix=blosum_matrix, 
                                       pseudoseqs_file=pseudoseqs_file)
     
-    #Initialize training dataset
-           
-    print(f"[3/4] Loading full dataset into RAM from {data_file}...") 
-    dataset_sa = NNAlign_MA_Dataset(file_path=data_file, min_length=args.peptide_lengths[0])              #MA dataset works for this SA setup, we only have to use a different collator_fn
-
-    #Initialize validation dataset
-    dataset_val = NNAlign_MA_Dataset(file_path=val_file, min_length=args.peptide_lengths[0])
+    #Initialize training and validation datasets
+    print(f"[3/4] Loading full dataset into RAM from {data_file}...")
+    if args.extra_features:
+        blosum_matrix_freq, aa_to_idx_freq = load_blosum_freq_rownorm(args.blosum_freq_file)
+        dataset_sa = NNAlign_SA_Dataset_ClassII_Blosum_Encoded_Extra_Features(file_path=data_file, min_length=args.peptide_lengths[0], blosum_matrix=blosum_matrix, aa_to_idx=aa_to_idx, pseudoseqs_dict=pseudoseqs_dict, blosum_matrix_freq=blosum_matrix_freq, aa_to_idx_freq=aa_to_idx_freq)
+        dataset_val = NNAlign_SA_Dataset_ClassII_Blosum_Encoded_Extra_Features(file_path=val_file, min_length=args.peptide_lengths[0], blosum_matrix=blosum_matrix, aa_to_idx=aa_to_idx, pseudoseqs_dict=pseudoseqs_dict, blosum_matrix_freq=blosum_matrix_freq, aa_to_idx_freq=aa_to_idx_freq)
+    else: 
+        dataset_sa = NNAlign_SA_Dataset_ClassII_Blosum_Encoded(file_path=data_file, min_length=args.peptide_lengths[0], blosum_matrix=blosum_matrix, aa_to_idx=aa_to_idx, pseudoseqs_dict=pseudoseqs_dict)              #MA dataset works for this SA setup, we only have to use a different collator_fn
+        dataset_val = NNAlign_SA_Dataset_ClassII_Blosum_Encoded(file_path=val_file, min_length=args.peptide_lengths[0], blosum_matrix=blosum_matrix, aa_to_idx=aa_to_idx, pseudoseqs_dict=pseudoseqs_dict)
+    
+   
+        
 
     #Initialize collator for batch construction
-    if args.extra_features:
-        blosum_matrix_freq, aa_to_idx_freq = load_blosum_freq_rownorm(blosum_file=args.blosum_freq_file)
-        collator = Collator_SA_Blosum_ClassII_Extra_Features(blosum_matrix=blosum_matrix, aa_to_idx=aa_to_idx, pseudoseqs_dict=pseudoseqs_dict, blosum_matrix_freq=blosum_matrix_freq, aa_to_idx_freq=aa_to_idx_freq, min_length=args.peptide_lengths[0], max_length=args.peptide_lengths[1])
-    else:
-        collator = Collator_SA_Blosum_ClassII(blosum_matrix=blosum_matrix, aa_to_idx=aa_to_idx, pseudoseqs_dict=pseudoseqs_dict)
+    collator = Collator_SA_Blosum_ClassII_Encoded(pseudoseqs_dict=pseudoseqs_dict)
 
     #Initialize dataloaders
     loader_sa = DataLoader(dataset_sa, 
@@ -170,16 +170,14 @@ def main():
                                  loader_ma=loader_sa,
                                  loader_sa=loader_sa,
                                  loader_val=loader_val,
-                                 logger=logger)
+                                 logger=logger,
+                                 collator=collator)
     
     #Train model and save learned weights
     trainer.train(num_epochs=args.num_epochs)
     print(f"[DONE] Saving weights to {syn_path}")
 
     trainer.save(syn_path=syn_path)
-
-    #Plot and save training curves
-    plot_training_curves(trainer=trainer, save_path=args.training_curves)
 
     wandb.finish()
 
